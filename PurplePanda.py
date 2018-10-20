@@ -90,33 +90,39 @@ class Gui(QtGui.QMainWindow):
         openFile.setShortcut("Ctrl+F")
         openFile.triggered.connect(self.fileOpen)
 
-        # Could be added for future use if the user wanted to add more segment boxes.
-        AddSegmentBoxAction = QtGui.QAction("&Add New Segment Box", self)
-        # AddSegmentBoxAction.triggered.connect(self.add_new_segment_box)
 
         # Add an action to open a configuration window that can be used to change some configuration/settings
         configwindow = QtGui.QAction("&Configuration", self)
+        configwindow.setShortcut("F8")
         configwindow.triggered.connect(self.open_configuration_window)
        
 
 
-        helpAction = QtGui.QAction("&Help", self)
-        helpAction.setShortcut("Ctrl+H")
-        helpAction.triggered.connect(self.helpMessage)        
+        help_usermanual_Action = QtGui.QAction(QtGui.QIcon(':/usermanual.png'), "&User Manual", self)
+        help_usermanual_Action.setShortcut("Alt+H")
+        help_usermanual_Action.triggered.connect(self.helpMessage)       
+
+        help_about_Action = QtGui.QAction("&About", self)
+        help_about_Action.setShortcut("Alt+F12")
+        help_about_Action.triggered.connect(self.helpMessage)  
         
         menubar = self.menuBar()
-        f_menu = menubar.addMenu('&File')
 
+        
         # Add the different action menus on the File menubar
+        f_menu = menubar.addMenu('&File')
         f_menu.addAction(openFile)        
-        f_menu.addAction(configwindow)
 
+        # Add the different action menus on the View menubar
+        v_menu = menubar.addMenu('&View')
+        v_menu.addAction(configwindow)
 
-        f_menu.addAction(AddSegmentBoxAction)
            
         # Add different action menus on the Help menubar
         h_menu = menubar.addMenu('&Help')
-        h_menu.addAction(helpAction)        
+        h_menu.addAction(help_usermanual_Action)
+        h_menu.addAction(help_about_Action)        
+        
         
         self.toolbar = self.addToolBar('Open Excel File')
         self.toolbar.addAction(openFile)
@@ -142,6 +148,7 @@ class Gui(QtGui.QMainWindow):
     def open_configuration_window(self):
         self.dialog = Configuration_Window(self)
         self.dialog.show()
+        print configurationbox_segments
 
 
 
@@ -388,8 +395,6 @@ class Gui(QtGui.QMainWindow):
 
         # -----------------------TO DO : CREATE A DICTIONARY WITH EACH KEY AS THE DIFFERENT FIELDS AND VALUES AS EMPTY ---------------------------------
 
-        print configurationbox_segments
-       
 
         # # Makes sure that when the Map button is clicked, a filename has been selected and if not, it will generate a popup message
         if not self.fname:
@@ -409,7 +414,8 @@ class Gui(QtGui.QMainWindow):
 
                     # For each grouped data, it goes through each dictionary and gets all the respective data segments
                     # To note for that each group, the MSH/PID/PV1 and OBR segments should be the same and only the OBX segments would change
-                    for each_dict_item in each_unique_id_info:              
+                    for each_dict_item in each_unique_id_info:
+                                
 
                         msh_result = self.create_hl7_dict_values.get_msh_data(each_dict_item)
                         pid_result = self.create_hl7_dict_values.get_pid_data(each_dict_item)
@@ -417,7 +423,6 @@ class Gui(QtGui.QMainWindow):
                         obr_result = self.create_hl7_dict_values.get_obr_data(each_dict_item)
                         obx_result = self.create_hl7_dict_values.get_obx_data(each_dict_item)
                         obx_fields_list.append(obx_result)
-
 
                     text_file.write("")
                     text_file.write(msh_result + "\n")
@@ -438,9 +443,6 @@ class Gui(QtGui.QMainWindow):
     def setMapping_clbs(self):
         '''This will perform the Mapping of the Columns to the different HL7 segments and Generate the CLBS file'''
 
-        # -----------------------TO DO : CREATE A DICTIONARY WITH EACH KEY AS THE DIFFERENT FIELDS AND VALUES AS EMPTY ---------------------------------
-       
-
         # # Makes sure that when the Map button is clicked, a filename has been selected and if not, it will generate a popup message
         if not self.fname:
             self.helpMessage()
@@ -452,8 +454,6 @@ class Gui(QtGui.QMainWindow):
 
             # This is the part where the data is going be written with proper format to the HL7 file
             with open("AllVariables purplepanda " + self.filename + ".clbs", "w") as text_file:
-
-                msmt_index = 2000
 
                 # Obtains all the data that is grouped under each unique NodeID
                 for each_unique_id, each_unique_id_info in self.final_hl7_message.iteritems():
@@ -513,11 +513,7 @@ class Configuration_Window(QtGui.QMainWindow):
 
     def initPage(self):
         logging.debug("setting Page") 
-        
-        # segment_box = QtGui.QHBoxLayout()
-        #     message_label = QtGui.QLabel(each_message)
-        #     self.message_box_information = QtGui.QLineEdit()
-        #     message_box.addWidget(message_label)
+
 
         hbox = QtGui.QHBoxLayout()
 
@@ -630,6 +626,7 @@ class Configuration_Window(QtGui.QMainWindow):
 
     def apply_configuration(self):
         ''' This will apply the new values to the configurationbox_segments dictionary'''
+        global configurationbox_segments
 
         # First read all the values from the configuration window
         for row in range(0,self.table.rowCount()):
@@ -641,24 +638,9 @@ class Configuration_Window(QtGui.QMainWindow):
             if column0_text in configurationbox_segments.keys():
                 configurationbox_segments[column0_text] = column1_text
 
-        print configurationbox_segments
-
         # Will have to modify the dropdown hl7 menu list once the configurationbox_segments dictionary is updated
         hl7_dropdown_menu_items = Hl7_menu()
         hl7_dropdown_menu_items.create_dropdown_items_from_dict(configurationbox_segments)
-
-        # Once the configuration values are changed, the table in the main window from class Gui also has to be updated with the correct dropdown menu
-
-        Gui_instance = Gui(self)
-        print Gui_instance.table
-        for row in range(0,Gui_instance.table.rowCount()):
-            column1_text = Gui_instance.table.cellWidget(row,1)
-            menu = QtGui.QMenu()
-
-            print column1_text
-
-            self.make_hl7Menu(column1_text,menu,hl7_dropdown_menu_items.hl7_dropdown_dict)
-            column1_text.setMenu(menu)
 
 
 
