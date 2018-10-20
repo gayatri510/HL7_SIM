@@ -31,7 +31,9 @@ class Gui(QtGui.QMainWindow):
         self.tabs      = QtGui.QTabWidget()
         self.fname     = ''
         
-       
+
+        self.hl7_dropdown_menu_items = None
+        
         self.msg_header_variables = [758, 1914, 1929, 1930, 1931, 2255, 2949, 3097, 6510, 6511, 8036]
 
         self.non_obx_message_variables = [1190, 2583, 5815, 5816]
@@ -111,11 +113,33 @@ class Gui(QtGui.QMainWindow):
         
     def open_configuration_window(self):
         self.dialog = Configuration_Window(self)
-        self.dialog.show()
-        print configurationbox_segments
+        self.dialog.exec_()
+        #print configurationbox_segments
+        self.post_config_update()
+        
+
+    def post_config_update(self):
+        # after making config changes re populate table        
+        self.updMenuTable()
 
 
+    def updMenuTable(self):
+        if not self.hl7_dropdown_menu_items:
+            self.hl7_dropdown_menu_items = Hl7_menu()
+        self.hl7_dropdown_menu_items.create_dropdown_items_from_dict(configurationbox_segments)
 
+        for i in xrange(len(self.tabs)):            
+            widg  = self.tabs.widget(i).layout()
+            table = widg.itemAt(0).widget()
+            for row in xrange(table.rowCount()):
+                dropdown = table.cellWidget(row,1)
+                menu     = QtGui.QMenu()
+            
+                self.make_hl7Menu(dropdown,menu,self.hl7_dropdown_menu_items.hl7_dropdown_dict)
+                dropdown.setMenu(menu)
+        
+        
+        
     def set_message_boxes(self):
 
         self.list_of_message_boxes = []
@@ -256,8 +280,9 @@ class Gui(QtGui.QMainWindow):
         if not self.xfile:
             return
 
-        hl7_dropdown_menu_items = Hl7_menu()
-        hl7_dropdown_menu_items.create_dropdown_items_from_dict(configurationbox_segments)
+        if not self.hl7_dropdown_menu_items:
+            self.hl7_dropdown_menu_items = Hl7_menu()
+        self.hl7_dropdown_menu_items.create_dropdown_items_from_dict(configurationbox_segments)
 
         # for each sheet create a tab and populate with a table
         tables  = []
@@ -296,12 +321,12 @@ class Gui(QtGui.QMainWindow):
                 dropdown = QtGui.QPushButton()
                 menu     = QtGui.QMenu()
             
-                self.make_hl7Menu(dropdown,menu,hl7_dropdown_menu_items.hl7_dropdown_dict)
+                self.make_hl7Menu(dropdown,menu,self.hl7_dropdown_menu_items.hl7_dropdown_dict)
                 dropdown.setMenu(menu)
                 
                 table_contents.append((label,dropdown))
 
-            # This populates the table with table_contents's contents in the given row and cell.
+            # This populates the table with table_contents's contents in the given row and cell.o
             # row Each will have two columns with the first column populated with column_1 which is the label and column_2 which is the Dropdown 
             ix = 0
             for column_1, column_2 in table_contents:

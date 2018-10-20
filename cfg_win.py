@@ -8,7 +8,7 @@ logging.basicConfig(level=logging.CRITICAL,
 )
 
 
-class Configuration_Window(QtGui.QMainWindow):
+class Configuration_Window(QtGui.QDialog):
 
     def __init__(self, parent=None):
         super(Configuration_Window, self).__init__()
@@ -17,17 +17,16 @@ class Configuration_Window(QtGui.QMainWindow):
         self.initPage()                   
         self.runWindow()
 
+        # adjust dialogs height and width based
+        # on the items added inside
+        self.height = 0
+        self.width  = 0        
 
+        
     def initWindow(self):    
         QtGui.QToolTip.setFont(QtGui.QFont('SansSerif', 10))
         self.wid = QtGui.QWidget(self)
-        self.setCentralWidget(self.wid)
 
-
-    def center(self):
-        qr = self.frameGeometry()
-        cp = QtGui.QDesktopWidget().availableGeometry().center()   
-        self.move(qr.topLeft())
 
     def initPage(self):
         logging.debug("setting Page") 
@@ -59,11 +58,8 @@ class Configuration_Window(QtGui.QMainWindow):
         # apane.addWidget(btn_exit)
 
         vbox.addLayout(hbox)
-
         vbox.addWidget(self.table)
-
         vbox.addLayout(hbox)   
-    
         vbox.addLayout(apane)
 
         self.wid.setLayout(vbox)
@@ -72,13 +68,13 @@ class Configuration_Window(QtGui.QMainWindow):
         self.table = QtGui.QTableWidget()
         self.table.horizontalHeader().setVisible(False)
         self.table.verticalHeader().setVisible(False)            
-           
+        self.table.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
+        
         # This will populate the table with the contents in the xcolumns list and the number of columns are always set to 2 
         self.table.setRowCount(len(configurationbox_segments))
         self.table.setColumnCount(2)
 
         items_list = [str(i) for i in xrange(1,31)]
-
 
         # This will generate the table contents that will next be used to fill the table
         table_contents = []
@@ -101,17 +97,20 @@ class Configuration_Window(QtGui.QMainWindow):
             self.table.setCellWidget(index, 1, column_2)
             index = index + 1
 
-        header = self.table.horizontalHeader()
-        header.setResizeMode(0, QtGui.QHeaderView.Stretch)
-        header.setResizeMode(1, QtGui.QHeaderView.Stretch)
+        self.table.resizeColumnsToContents()
 
-
+        self.height = self.table.height()
+        # i dont know why i have to do this, how is the table's vertical scroll limit set
+        self.height = self.height - 200
+        
+        # length() includes the width of all its sections + scroll bar width
+        self.width = self.table.horizontalHeader().length()
+        self.width += self.table.verticalScrollBar().width()
+        
            
     def runWindow(self):
-        self.resize(1000, 1000)
-        self.center()
+        self.resize(self.width,self.height)
         self.setWindowTitle('Configuration')
-        self.setWindowIcon(QtGui.QIcon(':/tool.png'))
 
 
     def set_default_configuration_value(self, message_box_information, message_label):
@@ -156,5 +155,4 @@ class Configuration_Window(QtGui.QMainWindow):
         hl7_dropdown_menu_items = Hl7_menu()
         hl7_dropdown_menu_items.create_dropdown_items_from_dict(configurationbox_segments)
 
-
-
+        self.close()
