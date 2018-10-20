@@ -6,7 +6,6 @@ import xlrd
 import img_qr
 from cfg_win import Configuration_Window
 import re
-import time
 from hl7menu import Hl7_menu
 from create_hl7_data import Create_Hl7_Data
 from config import configurationbox_segments, default_hl7_segments
@@ -19,8 +18,6 @@ class Gui(QtGui.QMainWindow):
     
     def __init__(self,app):
         super(Gui, self).__init__()
-
-
 
         self.app       = app
         self.wid       = None
@@ -37,7 +34,6 @@ class Gui(QtGui.QMainWindow):
         self.msg_header_variables = [758, 1914, 1929, 1930, 1931, 2255, 2949, 3097, 6510, 6511, 8036]
 
         self.non_obx_message_variables = [1190, 2583, 5815, 5816]
-
 
         self.initWindow()
         self.initMenu()        
@@ -372,9 +368,7 @@ class Gui(QtGui.QMainWindow):
         self.create_hl7_dict_values.split_message_box_segments(self.list_of_message_information)
 
         # update progress bar
-        self.prog.setValue(20)
-
-        time.sleep(30)
+        self.prog.setValue(5)
 
         # Reads data from excel sheet and formats it 
         self.create_hl7_dict_values.read_excel_data(self.fname, self.tabs.currentWidget().layout().itemAt(0).widget())
@@ -386,9 +380,8 @@ class Gui(QtGui.QMainWindow):
 
 
         # update progress bar
-        self.prog.setValue(40)
+        self.prog.setValue(25)
 
-        time.sleep(30)
 
         # Generates a dictionary with all the data that can now be written to a file
         self.final_hl7_message = self.create_hl7_dict_values.generate_hl7_message_data()
@@ -416,6 +409,8 @@ class Gui(QtGui.QMainWindow):
             # This is the part where the data is going be written with proper format to the HL7 file
             with open("AllVariables purplepanda " + self.filename + ".hl7", "w") as text_file:
 
+                prog = 60
+                quant = float(40)/float(len(self.final_hl7_message))
                 # Obtains all the data that is grouped under each unique NodeID
                 for each_unique_id, each_unique_id_info in self.final_hl7_message.iteritems():
                     obx_fields_list = []
@@ -440,7 +435,9 @@ class Gui(QtGui.QMainWindow):
                     for each_obx_string in obx_fields_list:
                         text_file.write(each_obx_string + "\n")
                     text_file.write("\n")   
-
+                                        
+                    self.prog.setValue(prog)
+                    prog = prog + quant
 
             self.prog.setValue(100)
             text_to_print = "Mapping is Done!!!\n" + "The file is stored as " + "AllVariables PurplePanda " + self.filename + ".hl7"             
