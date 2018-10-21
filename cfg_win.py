@@ -113,6 +113,10 @@ class Configuration_Window(QtGui.QDialog):
         self.resize(self.width,self.height)
         self.setWindowTitle('Configuration')
 
+        header = self.table.horizontalHeader()
+        header.setResizeMode(0, QtGui.QHeaderView.Stretch)
+        header.setResizeMode(1, QtGui.QHeaderView.ResizeToContents)
+        
 
     def set_default_configuration_value(self, message_box_information, message_label):
         ''' This method will set the default values for the different segments in the dropdown box'''
