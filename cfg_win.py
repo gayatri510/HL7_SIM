@@ -101,10 +101,11 @@ class Configuration_Window(QtGui.QDialog):
 
         self.height = self.table.height()
         # i dont know why i have to do this, how is the table's vertical scroll limit set
-        self.height = self.height - 200
+        self.height = self.height - 150
         
         # length() includes the width of all its sections + scroll bar width
         self.width = self.table.horizontalHeader().length()
+        self.width += self.table.verticalHeader().width()        
         self.width += self.table.verticalScrollBar().width()
         
            
