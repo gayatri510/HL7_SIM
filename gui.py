@@ -218,6 +218,10 @@ class Gui(QtGui.QMainWindow):
 
     def make_hl7Menu(self,dropdown,menu,hl7_dictionary):      
         for key in hl7_dictionary:
+            if key == " ":
+                action = menu.addAction(key)
+                action.triggered.connect(self.updateTable(dropdown,key))
+                continue
             sub_menu = menu.addMenu(key)
             action = sub_menu.addAction(key)
             action.triggered.connect(self.updateTable(dropdown,key))

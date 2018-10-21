@@ -47,6 +47,7 @@ class Hl7_menu():
 
         
         self.hl7_dropdown_dict = OrderedDict()
+        self.hl7_dropdown_dict[" "] = " "        
         for key in segments_and_counts_dict.keys():
   
             self.hl7_seg_field_dict = OrderedDict()
@@ -75,7 +76,6 @@ class Hl7_menu():
 
                 self.hl7_dropdown_dict[key] = self.hl7_seg_field_dict
 
-        
 
 
    
