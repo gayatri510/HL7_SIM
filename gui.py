@@ -170,13 +170,7 @@ class Gui(QtGui.QMainWindow):
         # This function will generate, initialize mulitple message/vbox widgets with the appropriate labels and return the list of the boxes to be laid out
         self.list_of_message_boxes = self.set_message_boxes()
 
- 
-        '''
-        table
-        '''
-        # This function will populate a table and its contents to be laid out 
-        self.popTable()
-      
+
         '''
         action pane
         '''  
@@ -262,7 +256,7 @@ class Gui(QtGui.QMainWindow):
             pass
         else:
             self.filename, file_extension = os.path.splitext(os.path.basename(fname))
-            if 'xlsx' in file_extension:
+            if ('xlsx' in file_extension) or ('xlsm' in file_extension):
                 self.fname = fname
                 self.xfile = pd.ExcelFile(self.fname)
                 self.popTable()
@@ -270,14 +264,33 @@ class Gui(QtGui.QMainWindow):
             #add try catch and create a message box with file open error
                 self.helpMessage()
 
-        self.statusBar().showMessage('Ready')        
+        self.statusBar().showMessage('Ready')       
+
+
+    def sheets_to_import(self, sheetnames):
+        '''Will return a list of sheets to be considered from the excel sheet'''
+
+        sheets_not_to_import = ["Template Cover Sheet", "Summary", "General", "Report", "Comparison_Report"]
+
+        for sheet in sheetnames:
+            matchObj = re.match( r'OUTPUT_\w+', sheet, re.I)
+            if matchObj:
+                sheets_not_to_import.append(matchObj.group())
+
+
+        sheets_to_import = [sheet for sheet in sheetnames if sheet not in sheets_not_to_import]
+
+        return sheets_to_import
+ 
 
 
     def popTable(self):
+        '''populates the table with tabs etc..'''
 
-        # This will populate a table if no table exists. It will hide the row and column attributes (i.e.1 , 2 etc.)
-        if not self.xfile:
-            return
+        # Check if there are any existing tabs and clear them
+        if self.tabs.count() > 0:
+            self.tabs.clear()
+
 
         if not self.hl7_dropdown_menu_items:
             self.hl7_dropdown_menu_items = Hl7_menu()
@@ -287,9 +300,11 @@ class Gui(QtGui.QMainWindow):
         tables  = []
         xtabs   = []
         vboxs   = []
-        sht_idx = 0
 
-        for sheet in self.xfile.sheet_names:
+        # Obtain the main sheets which have information for creating the HL7 files and exclude all the miscellaneous files of the QE sheet
+        self.sheet_names = self.sheets_to_import(self.xfile.sheet_names)
+
+        for sht_idx, sheet in enumerate(self.sheet_names):
             logging.debug("sheet found : " + sheet)            
 
             # This will populate the table with the contents in the xcolumns list
@@ -341,9 +356,8 @@ class Gui(QtGui.QMainWindow):
             vboxs[sht_idx].addWidget(tables[sht_idx])        
             xtabs[sht_idx].setLayout(vboxs[sht_idx])
             self.tabs.addTab(xtabs[sht_idx],sheet)
-            sht_idx +=1
-        
-            
+
+                    
     def load_popup(self,text):
         popup = QtGui.QMessageBox( QtGui.QMessageBox.NoIcon, "Success!!! ", text,  QtGui.QMessageBox.NoButton)
         # Get the layout
@@ -365,13 +379,16 @@ class Gui(QtGui.QMainWindow):
         # update status bar
         self.statusBar().showMessage('Wait!...Mapping...')
 
-        # Reads data from excel sheet and formats it 
-        self.create_hl7_dict_values.read_excel_data(self.fname, self.tabs.currentWidget().layout().itemAt(0).widget())
+        # Reads data from the current tab's sheet and table   
+        self.sheetab_string = str(self.tabs.tabText (self.tabs.currentIndex()))
+        sheettab_table = self.tabs.currentWidget().layout().itemAt(0).widget()
 
-        # This will remove any variables that dont have to be part of the HL7 message like the I:E ratio variables etc
-        # The variables are listed in two lists one is the self.msg_header_variables and self.non_obx_message_variables
-        self.create_hl7_dict_values.remove_variables_from_list(self.non_obx_message_variables)
-        self.create_hl7_dict_values.remove_variables_from_list(self.msg_header_variables)
+        self.create_hl7_dict_values.read_excel_data(self.xfile, self.sheetab_string, sheettab_table)
+
+        # # This will remove any variables that dont have to be part of the HL7 message like the I:E ratio variables etc
+        # # The variables are listed in two lists one is the self.msg_header_variables and self.non_obx_message_variables
+        # self.create_hl7_dict_values.remove_variables_from_list(self.non_obx_message_variables)
+        #self.create_hl7_dict_values.remove_variables_from_list(self.msg_header_variables)
 
         # Generates a dictionary with all the data that can now be written to a file
         self.final_hl7_message = self.create_hl7_dict_values.generate_hl7_message_data()
@@ -394,7 +411,7 @@ class Gui(QtGui.QMainWindow):
             self.generic_set_mapping()
             
             # This is the part where the data is going be written with proper format to the HL7 file
-            with open("AllVariables purplepanda " + self.filename + ".hl7", "w") as text_file:
+            with open("AllVariables " + self.sheetab_string + ".hl7", "w") as text_file:
 
                 # Obtains all the data that is grouped under each unique NodeID
                 for each_unique_id, each_unique_id_info in self.final_hl7_message.iteritems():
@@ -421,7 +438,7 @@ class Gui(QtGui.QMainWindow):
                         text_file.write(each_obx_string + "\n")
                     text_file.write("\n")                                           
 
-            text_to_print = "Mapping is Done!!!\n" + "The file is stored as " + "AllVariables PurplePanda " + self.filename + ".hl7"             
+            text_to_print = "Mapping is Done!!!\n" + "The file is stored as " + "AllVariables " + self.sheetab_string + ".hl7"             
             self.load_popup(text_to_print)
             self.statusBar().showMessage('Ready')
 
@@ -439,7 +456,7 @@ class Gui(QtGui.QMainWindow):
             self.generic_set_mapping()
             
             # This is the part where the data is going be written with proper format to the HL7 file
-            with open("AllVariables purplepanda " + self.filename + ".clbs", "w") as text_file:
+            with open("AllVariables " + self.sheetab_string + ".clbs", "w") as text_file:
 
                 # Obtains all the data that is grouped under each unique NodeID
                 for each_unique_id, each_unique_id_info in self.final_hl7_message.iteritems():
@@ -469,7 +486,7 @@ class Gui(QtGui.QMainWindow):
                     text_file.write("[END DEVICE]\n")
                     text_file.write("\n")
 
-            text_to_print = "Mapping is Done!!!\n" + "The file is stored as " + "AllVariables PurplePanda " + self.filename + ".clbs"             
+            text_to_print = "Mapping is Done!!!\n" + "The file is stored as " + "AllVariables " + self.sheetab_string + ".clbs"            
             self.load_popup(text_to_print)
             self.statusBar().showMessage('Ready')
 

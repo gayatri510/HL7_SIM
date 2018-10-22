@@ -201,7 +201,7 @@ class Create_Hl7_Data():
 
 
 
-    def read_excel_data(self, excel_sheet, data_table):
+    def read_excel_data(self, excel_sheet, sheet_to_read_from, data_table):
         ''' This method will read data from the excel sheet into a pandas data frame and also read the data from the table on the tool'''
 
 
@@ -209,12 +209,12 @@ class Create_Hl7_Data():
         # Rename the columns to the appropriate HL7 segments and then generate the HL7 file
         # The Code below ensures that each column data is taken as string instead of doing any conversions to float, int etc.
 
-        df_actual = pd.read_excel(excel_sheet)
-        column_list = df_actual.columns.values.tolist()
+        df_actual = excel_sheet.parse(sheet_to_read_from)
 
-        converter = {col: str for col in column_list} 
-        self.df = pd.read_excel(excel_sheet, converters=converter)
+        #column_list = df_actual.columns.values.tolist()
 
+        #converter = {col: str for col in column_list} 
+        self.df = excel_sheet.parse(sheet_to_read_from, converters= {col: str for col in df_actual.columns.values.tolist()})
 
 
         # Traverse through each row of the table, get the column 0 and 1 strings and if an HL7 segment mapping exists, then
@@ -229,7 +229,7 @@ class Create_Hl7_Data():
                 self.df.rename(columns={column0_text : column1_text},inplace=True)
 
             # # Optionally rename this into a different sheet for debugging purposes later
-            self.df.to_excel("Renamed_QE_sheet_June11.xlsx", index=False)
+            self.df.to_excel("Renamed_QE_sheet.xlsx", index=False)
 
 
     def remove_variables_from_list(self, var_list):
