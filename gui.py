@@ -21,14 +21,10 @@ class Gui(QtGui.QMainWindow):
 
         self.app       = app
         self.wid       = None
-        self.popup     = None
-        self.popup_lbl = None
-        self.prog      = None
         self.xfile     = None
         self.tabs      = QtGui.QTabWidget()
         self.fname     = ''
         
-
         self.hl7_dropdown_menu_items = None
         
         self.msg_header_variables = [758, 1914, 1929, 1930, 1931, 2255, 2949, 3097, 6510, 6511, 8036]
@@ -100,8 +96,9 @@ class Gui(QtGui.QMainWindow):
 
         
     def runWindow(self):
-        self.resize(1000, 1000)
-        self.center()
+        self.showMaximized()
+        #self.resize(1000, 1000)
+        #self.center()
         self.setWindowTitle('Purple Panda')
         self.setWindowIcon(QtGui.QIcon(':/tool.png'))
         self.show()
@@ -115,9 +112,11 @@ class Gui(QtGui.QMainWindow):
         
 
     def post_config_update(self):
+        self.statusBar().showMessage('Wait! Applying config changes')
         # after making config changes re populate table        
         self.updMenuTable()
-
+        self.statusBar().showMessage('Ready')
+        
 
     def updMenuTable(self):
         if not self.hl7_dropdown_menu_items:
@@ -343,23 +342,15 @@ class Gui(QtGui.QMainWindow):
             xtabs[sht_idx].setLayout(vboxs[sht_idx])
             self.tabs.addTab(xtabs[sht_idx],sheet)
             sht_idx +=1
-
-
-    def load_popup(self):
-        self.popup = QtGui.QMessageBox( QtGui.QMessageBox.NoIcon, "Wait", "Mapping in Progress !!!", QtGui.QMessageBox.NoButton)
+        
+            
+    def load_popup(self,text):
+        popup = QtGui.QMessageBox( QtGui.QMessageBox.NoIcon, "Success!!! ", text,  QtGui.QMessageBox.NoButton)
         # Get the layout
-        l = self.popup.layout()
+        l = popup.layout()
         # Hide the default button
         l.itemAtPosition( l.rowCount() - 1, 0 ).widget().hide()
-
-        self.prog      = QtGui.QProgressBar()
-        self.popup_lbl = QtGui.QLabel()
-        
-        # Add the progress bar at the bottom (last row + 1) and first column with column span
-        l.addWidget(self.prog,l.rowCount(), 0, 1, l.columnCount(), QtCore.Qt.AlignCenter )
-        l.addWidget(self.popup_lbl,l.rowCount(), 1, 1, l.columnCount(), QtCore.Qt.AlignCenter )        
-
-        self.popup.show()
+        popup.exec_()
 
 
     def generic_set_mapping(self):
@@ -371,8 +362,8 @@ class Gui(QtGui.QMainWindow):
         # Obtain the texts and map them to the respective HL7 Segmenclsts
         self.create_hl7_dict_values.split_message_box_segments(self.list_of_message_information)
 
-        # update progress bar
-        self.prog.setValue(5)
+        # update status bar
+        self.statusBar().showMessage('Wait!...Mapping...')
 
         # Reads data from excel sheet and formats it 
         self.create_hl7_dict_values.read_excel_data(self.fname, self.tabs.currentWidget().layout().itemAt(0).widget())
@@ -382,17 +373,9 @@ class Gui(QtGui.QMainWindow):
         self.create_hl7_dict_values.remove_variables_from_list(self.non_obx_message_variables)
         self.create_hl7_dict_values.remove_variables_from_list(self.msg_header_variables)
 
-
-        # update progress bar
-        self.prog.setValue(25)
-
-
         # Generates a dictionary with all the data that can now be written to a file
         self.final_hl7_message = self.create_hl7_dict_values.generate_hl7_message_data()
 
-        # update progress bar
-        self.prog.setValue(60)
-   
 
     def setMapping_hl7(self):
         '''This will perform the Mapping of the Columns to the different HL7 segments and Generate the HL7 file'''
@@ -407,14 +390,12 @@ class Gui(QtGui.QMainWindow):
 
         else:
             #create popup
-            self.load_popup()
+            self.statusBar().showMessage('Wait!...Data being written...')
             self.generic_set_mapping()
-
+            
             # This is the part where the data is going be written with proper format to the HL7 file
             with open("AllVariables purplepanda " + self.filename + ".hl7", "w") as text_file:
 
-                prog = 60
-                quant = float(40)/float(len(self.final_hl7_message))
                 # Obtains all the data that is grouped under each unique NodeID
                 for each_unique_id, each_unique_id_info in self.final_hl7_message.iteritems():
                     obx_fields_list = []
@@ -438,15 +419,11 @@ class Gui(QtGui.QMainWindow):
                     text_file.write(obr_result + "\n")
                     for each_obx_string in obx_fields_list:
                         text_file.write(each_obx_string + "\n")
-                    text_file.write("\n")   
-                                        
-                    self.prog.setValue(prog)
-                    prog = prog + quant
+                    text_file.write("\n")                                           
 
-            self.prog.setValue(100)
             text_to_print = "Mapping is Done!!!\n" + "The file is stored as " + "AllVariables PurplePanda " + self.filename + ".hl7"             
-            self.popup_lbl.setText(text_to_print)
-
+            self.load_popup(text_to_print)
+            self.statusBar().showMessage('Ready')
 
 
     def setMapping_clbs(self):
@@ -458,9 +435,9 @@ class Gui(QtGui.QMainWindow):
 
         else:
             #create popup
-            self.load_popup()
+            self.statusBar().showMessage('Wait!...Mapping...')
             self.generic_set_mapping()
-
+            
             # This is the part where the data is going be written with proper format to the HL7 file
             with open("AllVariables purplepanda " + self.filename + ".clbs", "w") as text_file:
 
@@ -492,9 +469,8 @@ class Gui(QtGui.QMainWindow):
                     text_file.write("[END DEVICE]\n")
                     text_file.write("\n")
 
-            self.prog.setValue(100)
             text_to_print = "Mapping is Done!!!\n" + "The file is stored as " + "AllVariables PurplePanda " + self.filename + ".clbs"             
-            self.popup_lbl.setText(text_to_print)
-
+            self.load_popup(text_to_print)
+            self.statusBar().showMessage('Ready')
 
 
