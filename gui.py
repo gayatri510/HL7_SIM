@@ -8,7 +8,7 @@ from cfg_win import Configuration_Window
 import re
 from hl7menu import Hl7_menu
 from create_hl7_data import Create_Hl7_Data
-from config import configurationbox_segments, default_hl7_segments
+from config import configurationbox_segments, default_hl7_segments, obr_7_timestamp
 
 logging.basicConfig(level=logging.DEBUG,
                     format='[%(threadName)s] %(message)s',
@@ -96,9 +96,9 @@ class Gui(QtGui.QMainWindow):
 
         
     def runWindow(self):
-        self.showMaximized()
-        #self.resize(1000, 1000)
-        #self.center()
+
+        self.resize(1000, 1000)
+        self.center()
         self.setWindowTitle('Purple Panda')
         self.setWindowIcon(QtGui.QIcon(':/tool.png'))
         self.show()
@@ -114,11 +114,32 @@ class Gui(QtGui.QMainWindow):
     def post_config_update(self):
         self.statusBar().showMessage('Wait! Applying config changes')
         # after making config changes re populate table        
-        self.updMenuTable()
+        self.update_Menu_Table()
+        #self.update_vboxes()
         self.statusBar().showMessage('Ready')
+
+
+    def update_vboxes(self):
+        '''Updates the static header boxes'''
+        print len(default_hl7_segments)
+        print self.vbox.itemAt(0)
+        print self.vbox.itemAt(1)
+        print self.vbox.itemAt(2)
+        print self.vbox.itemAt(3)
+        self.vbox.insertLayout(4, self.vbox.itemAt(3))
+        self.wid.setLayout(self.vbox)
+        # self.list_of_message_boxes = self.set_message_boxes()
+        # for each_vbox in self.list_of_message_boxes:
+        #     self.vbox.addLayout(each_vbox)
+
+        # self.vbox.addWidget(self.tabs)
+     
+        # self.vbox.addLayout(self.apane)
+        
+        # self.wid.setLayout(self.vbox)
         
 
-    def updMenuTable(self):
+    def update_Menu_Table(self):
         if not self.hl7_dropdown_menu_items:
             self.hl7_dropdown_menu_items = Hl7_menu()
         self.hl7_dropdown_menu_items.create_dropdown_items_from_dict(configurationbox_segments)
@@ -160,16 +181,17 @@ class Gui(QtGui.QMainWindow):
 
 
     def initPage(self):        
-        logging.debug("setting Page") 
+        logging.debug("Setting Page") 
 
-        vbox = QtGui.QVBoxLayout()
+
+        self.vbox = QtGui.QVBoxLayout()
+ 
 
         '''
         Message boxes
         '''
         # This function will generate, initialize mulitple message/vbox widgets with the appropriate labels and return the list of the boxes to be laid out
         self.list_of_message_boxes = self.set_message_boxes()
-
 
         '''
         action pane
@@ -190,24 +212,24 @@ class Gui(QtGui.QMainWindow):
         qbtn = QtGui.QPushButton('Exit', self)
         qbtn.setToolTip('Exit applicaton')        
         qbtn.clicked.connect(self.close)        
-        apane = QtGui.QHBoxLayout()
-        apane.addStretch(1)
-        apane.addWidget(btn_map_hl7)
-        apane.addWidget(btn_map_clbs)
-        apane.addWidget(qbtn)   
+        self.apane = QtGui.QHBoxLayout()
+        self.apane.addStretch(1)
+        self.apane.addWidget(btn_map_hl7)
+        self.apane.addWidget(btn_map_clbs)
+        self.apane.addWidget(qbtn)   
 
         '''
         Page Layout
         '''        
         # The following lists the order in which the page will be laid out. First the message boxes are placed, following the table followed by the buttons
         for each_vbox in self.list_of_message_boxes:
-            vbox.addLayout(each_vbox)
+            self.vbox.addLayout(each_vbox)
 
-        vbox.addWidget(self.tabs)
+        self.vbox.addWidget(self.tabs)
      
-        vbox.addLayout(apane)
+        self.vbox.addLayout(self.apane)
         
-        self.wid.setLayout(vbox)
+        self.wid.setLayout(self.vbox)
 
     def make_hl7Menu(self,dropdown,menu,hl7_dictionary):      
         for key in hl7_dictionary:
