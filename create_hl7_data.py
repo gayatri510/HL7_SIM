@@ -1,8 +1,7 @@
 #!/usr/bin/python2.7
 
 import sys
-from collections import defaultdict
-from collections import OrderedDict
+from collections import defaultdict, OrderedDict
 import pandas as pd
 import xlrd
 import copy
@@ -210,10 +209,6 @@ class Create_Hl7_Data():
         # The Code below ensures that each column data is taken as string instead of doing any conversions to float, int etc.
 
         df_actual = excel_sheet.parse(sheet_to_read_from)
-
-        #column_list = df_actual.columns.values.tolist()
-
-        #converter = {col: str for col in column_list} 
         self.df = excel_sheet.parse(sheet_to_read_from, converters= {col: str for col in df_actual.columns.values.tolist()})
 
 
