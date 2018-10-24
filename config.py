@@ -19,5 +19,5 @@ configurationbox_segments = OrderedDict([('MSH Field Count', '17'),
                                          ])
 
 default_hl7_segments = "MSH, PID, PV1, OBR"
-obr_7_timestamp = False
-obx_14_timestamp = False
+obr_7_timestamp_default_state = True
+obx_14_timestamp_default_state = True
