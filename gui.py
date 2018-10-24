@@ -21,8 +21,10 @@ logging.basicConfig(level=logging.DEBUG,
 COMPANY_NAME = "CapsuleTech"
 APPLICATION_NAME = "MainWindow"
 QE_INPUT_SHEETS_TO_DISCARD = ["Template Cover Sheet", "Summary", "General", "Report", "Comparison_Report"]
-self.msg_header_variables = [758, 1914, 1929, 1930, 1931, 2255, 2949, 3097, 6510, 6511, 8036]
-self.non_obx_message_variables = [1190, 2583, 5815, 5816]
+# self.msg_header_variables = [758, 1914, 1929, 1930, 1931, 2255, 2949, 3097, 6510, 6511, 8036]
+# self.non_obx_message_variables = [1190, 2583, 5815, 5816]
+
+default_calculated_variables = "1190, 2583, 5815, 5816"
 
 class Gui(QtGui.QMainWindow):
     
@@ -476,15 +478,19 @@ class Gui(QtGui.QMainWindow):
         self.sheetab_string = str(self.tabs.tabText (self.tabs.currentIndex()))
         sheettab_table = self.tabs.currentWidget().layout().itemAt(0).widget()
 
-        self.create_hl7_dict_values.read_excel_data(self.xfile, self.sheetab_string, sheettab_table)
+        var_list = map(int, default_calculated_variables.split(','))
+
+        self.create_hl7_dict_values.read_excel_data(self.xfile, self.sheetab_string, sheettab_table, var_list)
 
         # # This will remove any variables that dont have to be part of the HL7 message like the I:E ratio variables etc
         # # The variables are listed in two lists one is the self.msg_header_variables and self.non_obx_message_variables
-        # self.create_hl7_dict_values.remove_variables_from_list(self.non_obx_message_variables)
+        # self.create_hl7_dict_values.remove_variables_from_list(map(int, default_calculated_variables.split(',')))
         #self.create_hl7_dict_values.remove_variables_from_list(self.msg_header_variables)
 
         # Generates a dictionary with all the data that can now be written to a file
         self.final_hl7_message = self.create_hl7_dict_values.generate_hl7_message_data()
+
+        print self.final_hl7_message
 
 
     def setMapping_hl7(self):
