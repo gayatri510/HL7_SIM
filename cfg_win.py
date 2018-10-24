@@ -17,6 +17,29 @@ class Configuration_Window(QtGui.QDialog):
 
         self.cfg_window_settings = QtCore.QSettings(COMPANY_NAME, "Configuration_Window") 
 
+        # ------------ THE BELOW TWO HAVE TO BE MOVED TO CONFIG.PY AND ADDED TO LOAD SETTINGS AND OTHER STUFF
+        self.default_calculated_variables = "1190, 2583, 5815, 5816"
+        self.header_variables = OrderedDict([('6510', 'MSH-3'),
+                                ('7914', 'MSH-3-1'),
+                                ('1911', 'MSH-3-2'),
+                                ('6511', 'MSH-4'),
+                                ('6512', 'MSH-5'),
+                                ('6513', 'MSH-6'),                                      
+                                ('2255', 'MSH-7'),
+                                ('9569', 'PID-3'),
+                                ('1929', 'PID-3-1'),                                        
+                                ('1930', 'PID-5'),
+                                ('8340', 'PID-5-1'),
+                                ('2901', 'PID-5-2'),
+                                ('1220', 'PID-7'),
+                                ('170',  'PID-8'),
+                                ('8036', 'PID-18'),   
+                                ('6521', 'PV1-2'),
+                                ('9593', 'OBR-2'),
+                                ('8102', 'OBR-3')                                   
+                                ])
+
+
 
         #Obtain the settings to load from the Main Window class and load the default settings
         self.default_hl7_segments = settings_to_load.value('HL7_segments', type = str)
@@ -62,12 +85,51 @@ class Configuration_Window(QtGui.QDialog):
             self.table.setCellWidget(index, 1, message_box_information)
             index = index + 1
 
+
         self.tableGroupBox = QtGui.QGroupBox("HL7 Segment Default Settings")
         tableLayout = QtGui.QVBoxLayout()
         tableLayout.addWidget(self.table)
         self.tableGroupBox.setLayout(tableLayout)
 
-    
+
+        # Header Variables table
+        self.headervariablesGroupBox = QtGui.QGroupBox("Header Variables")
+ 
+        self.headervariablesTable = QtGui.QTableWidget()
+        self.headervariablesTable.setColumnCount(2)
+        self.headervariablesTable.setRowCount(len(self.header_variables) + 10)
+
+
+        for n, key in enumerate(self.header_variables.keys()):
+            self.headervariablesTable.setItem(n,0, QtGui.QTableWidgetItem(key))
+            self.headervariablesTable.setItem(n,1, QtGui.QTableWidgetItem(self.header_variables[key]))
+
+
+
+        print self.headervariablesTable.itemAt(0, 0).text()
+        print self.headervariablesTable.itemAt(1, 0).text()
+        print self.headervariablesTable.itemAt(2, 0).text()
+
+
+        self.headervariablesTable.setHorizontalHeaderLabels(("Capsule Variable ID", "Header Description"))
+        self.headervariablesTable.horizontalHeader().setResizeMode(0, QtGui.QHeaderView.Stretch)
+        self.headervariablesTable.horizontalHeader().setResizeMode(1, QtGui.QHeaderView.Stretch)
+        self.headervariablesTable.horizontalHeader().resizeSection(1, 180)
+
+
+        headervariablesLayout = QtGui.QVBoxLayout()
+        headervariablesLayout.addWidget(self.headervariablesTable)
+        self.headervariablesGroupBox.setLayout(headervariablesLayout)
+
+
+        # Calculated Variables
+        calculated_variables_text = QtGui.QLabel("Calculated Variables")
+        self.calculated_variables = QtGui.QLineEdit()
+        self.calculated_variables.setText(self.default_calculated_variables)
+        calculated_variables_text.setBuddy(self.calculated_variables)
+
+
+        # OBR and OBX Timestamps
         self.obr7_timestamp_checkbox = QtGui.QCheckBox("Generate Timestamp In OBR-7 field",self)
         self.obr7_timestamp_checkbox.setChecked(default_obr7_timestamp_state)
         self.cfg_window_settings.setValue('OBR 7 timestamp', default_obr7_timestamp_state)
@@ -86,14 +148,17 @@ class Configuration_Window(QtGui.QDialog):
         mainLayout.addWidget(msg_label, 0, 0)
         mainLayout.addWidget(self.msg_linedit, 0, 1)
         mainLayout.addWidget(self.tableGroupBox, 1, 0, 1, 2)
-        mainLayout.addWidget(self.obr7_timestamp_checkbox, 2, 0, 1, 2)
-        mainLayout.addWidget(self.obx14_timestamp_checkbox, 3, 0, 1, 2)
-        mainLayout.addWidget(self.buttonBox, 4, 0, 1, 2)
+        mainLayout.addWidget(self.headervariablesGroupBox, 2, 0, 1, 2)
+        mainLayout.addWidget(calculated_variables_text, 3, 0)
+        mainLayout.addWidget(self.calculated_variables, 3, 1)
+        mainLayout.addWidget(self.obr7_timestamp_checkbox, 4, 0, 1, 2)
+        mainLayout.addWidget(self.obx14_timestamp_checkbox, 5, 0, 1, 2)
+        mainLayout.addWidget(self.buttonBox, 6, 0, 1, 2)
         self.setLayout(mainLayout)
  
  
         self.setWindowTitle("Configuration Settings")
-        self.resize(650, 400)
+        self.resize(900, 600)
 
 
     def obr7_timestamp_statechange(self):
@@ -135,5 +200,19 @@ class Configuration_Window(QtGui.QDialog):
                 current_configurationbox_segments[column0_text] = column1_text
 
         self.cfg_window_settings.setValue('Configurationbox_segments', current_configurationbox_segments)
+
+        print self.headervariablesTable.itemAt(0, 0).text()
+        print self.headervariablesTable.itemAt(1, 0).text()
+        print self.headervariablesTable.itemAt(2, 0).text()
+        print self.headervariablesTable.itemAt(3, 0).text()
+
+
+
+        # for row in range(0, self.headervariablesTable.rowCount()):
+        #     print row
+        #     column0_text = self.headervariablesTable.itemAt(row, 0).text()
+        #     column1_text = self.headervariablesTable.itemAt(row, 1).text()
+        #     print column0_text, column1_text
+
 
         return self.cfg_window_settings

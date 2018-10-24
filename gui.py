@@ -7,10 +7,11 @@ import xlrd
 import img_qr
 from cfg_win import Configuration_Window
 import re
+from copy import deepcopy
 from hl7menu import Hl7_menu
 from collections import OrderedDict
 from create_hl7_data import Create_Hl7_Data
-from config import configurationbox_segments, default_hl7_segments, obr_7_timestamp
+from config import configurationbox_segments, default_hl7_segments, obr_7_timestamp_default_state, obx_14_timestamp_default_state
 
 logging.basicConfig(level=logging.DEBUG,
                     format='[%(threadName)s] %(message)s',
@@ -19,6 +20,9 @@ logging.basicConfig(level=logging.DEBUG,
 
 COMPANY_NAME = "CapsuleTech"
 APPLICATION_NAME = "MainWindow"
+QE_INPUT_SHEETS_TO_DISCARD = ["Template Cover Sheet", "Summary", "General", "Report", "Comparison_Report"]
+self.msg_header_variables = [758, 1914, 1929, 1930, 1931, 2255, 2949, 3097, 6510, 6511, 8036]
+self.non_obx_message_variables = [1190, 2583, 5815, 5816]
 
 class Gui(QtGui.QMainWindow):
     
@@ -30,17 +34,9 @@ class Gui(QtGui.QMainWindow):
         self.xfile     = None
         self.tabs      = QtGui.QTabWidget()
         self.fname     = ''
-        self.configuration_window = None
-
-        
-
-        
+        self.configuration_window = None      
         self.hl7_dropdown_menu_items = None
         
-        self.msg_header_variables = [758, 1914, 1929, 1930, 1931, 2255, 2949, 3097, 6510, 6511, 8036]
-
-        self.non_obx_message_variables = [1190, 2583, 5815, 5816]
-
         self.initWindow()
         self.initMenu() 
         self.load_settings()       
@@ -54,8 +50,16 @@ class Gui(QtGui.QMainWindow):
         self.default_settings = QtCore.QSettings(COMPANY_NAME, APPLICATION_NAME) 
         self.default_settings.setValue('HL7_segments', default_hl7_segments)
         self.default_settings.setValue('Configurationbox_segments', configurationbox_segments)
-        
+        self.default_settings.setValue('OBR 7 timestamp', obr_7_timestamp_default_state)
+        self.default_settings.setValue('OBX 14 timestamp', obx_14_timestamp_default_state)
 
+        self.default_settings.sync()
+
+
+        # state = bool(self.default_settings.value('OBR 7 timestamp'))
+        # print state
+
+        
     def initWindow(self):    
         logging.debug("initializing window") 
 
@@ -123,76 +127,90 @@ class Gui(QtGui.QMainWindow):
         self.show()
 
 
-    def self.update_settings(self, default_settings, cfg_window_settings):
-        '''Will look at the differences between the current settings configured by the user and the default settings and apply changes wherever necessary'''
-         pass           
-        # sg = cfg_window_settings.value('HL7_segments', type = str)
-        # print sg
+    def update_main_window(self, update_hl7segments_tabs = False, update_hl7_configurationbox_menu = False, update_obr_timestamp = False, update_obx_timestamp = False):
+        ''' Applies the changed settings to the main window'''
+        self.statusBar().showMessage('Wait! Applying config changes')
+        if update_hl7_configurationbox_menu == True:
+            if self.update_Menu_Table() == True:
+                self.statusBar().showMessage('Done! The Table has been updated with the applied configuration settings')
+            else:
+                pass
+                # Write code for an exception that might have occurred
+        else:
+            pass
 
-        # current_configurationbox = cfg_window_settings.value('Configurationbox_segments').toPyObject()
-        # current_configurationbox_segments = OrderedDict()
-        # for key, value in current_configurationbox.items():
-        #     current_configurationbox_segments[str(key)] = value
 
-        # print current_configurationbox_segments
+    def compare_hl7_segments(self, original, current):
+        ''' Compares the original and current HL7 segments'''
+        original_hl7_segment_list = original.split(',')
+        current_hl7_segment_list = map(str, current.split(','))
+        return bool(set(current_hl7_segment_list).difference(original_hl7_segment_list))
+
+
+    def compare_hl7_configurationbox_segment_values(self, original_dict, current_dict):
+        '''Compares the original and current configuration box segment values'''
+        return bool(set(current_dict.items()).difference(original_dict.items()))
+
+
+
+    def update_settings(self, cfg_window_settings):
+        '''Will look at the differences between the current settings configured by the user and the default settings and apply changes wherever necessary'''          
+        update_hl7segments_tabs = False
+        update_hl7_configurationbox_menu = False
+        update_obr_timestamp = False
+        update_obx_timestamp = False
+
+        # Grabs the HL7 Segments data and compares with the defaults to see if it changed
+        self.current_hl7_segment_data = cfg_window_settings.value('HL7_segments', type = str)
+        if self.compare_hl7_segments(default_hl7_segments, self.current_hl7_segment_data):
+            print "Yes HL7 segments changed"
+            update_hl7segments_tabs = True
+            #self.update_hl7_segments()
+
+        # Grabs the HL7 segment configuration box data and compares with the defaults to see if it changed
+        current_configurationbox_data = cfg_window_settings.value('Configurationbox_segments').toPyObject()
+        self.current_configurationbox_segments_data = OrderedDict()
+        for key, value in current_configurationbox_data.items():
+             self.current_configurationbox_segments_data[str(key)] = value
+
+        if  self.compare_hl7_configurationbox_segment_values(configurationbox_segments, self.current_configurationbox_segments_data):
+            print "Yes HL7 Menubox changed"
+            update_hl7_configurationbox_menu = True
+
+
+        # Grabs the OBR7 and OBX14 checkbox states and compares with the defaults to see if they changed
+        self.obr_7_timestamp_state = cfg_window_settings.value('OBR 7 timestamp').toBool()
+        if (obr_7_timestamp_default_state ^ self.obr_7_timestamp_state):
+            print "OBR 7 changed"
+            update_obr_timestamp = True
+
+        self.obx_14_timestamp_state = cfg_window_settings.value('OBX 14 timestamp').toBool()
+        if (obx_14_timestamp_default_state ^ self.obx_14_timestamp_state):
+            print "OBX 14 changed"
+            update_obx_timestamp = True
+
+
+        # Once it determines what settings have been changed, the appropriate settings will only be applied to the mainwindow
+        self.update_main_window(update_hl7segments_tabs, update_hl7_configurationbox_menu, update_obr_timestamp, update_obx_timestamp)
+
 
     def open_configuration_window(self):
-        default_settings = self.default_settings
+        ''' Opens the configuration window to make the updates'''
 
         if self.configuration_window is None:
-            self.configuration_window = Configuration_Window(default_settings)
+            self.configuration_window = Configuration_Window(self.default_settings)
  
         if self.configuration_window.exec_():
             cfg_window_settings = self.configuration_window.get_current_settings()
-            self.update_settings(default_settings, cfg_window_settings)
-
-   
-
-        # hl7_segment_setting_values = settings_to_load.value('Configurationbox_segments').toPyObject()
-        # hl7_segment_setting_values_dict = OrderedDict()
-        # for key, value in hl7_segment_setting_values.items():
-        #     hl7_segment_setting_values_dict[str(key)] = value
-
-
-        #     settings = QtCore.QSettings(self.configuration_window.hl7_segment_boxes())
-
-        # self.setSettingsObject(settings)
- 
-        #self.post_config_update()
-        
-
-    # def post_config_update(self):
-    #     self.statusBar().showMessage('Wait! Applying config changes')
-    #     # after making config changes re populate table        
-    #     self.update_Menu_Table()
-    #     #self.update_vboxes()
-    #     self.statusBar().showMessage('Ready')
-
-
-    # def update_vboxes(self):
-    #     '''Updates the static header boxes'''
-    #     print len(default_hl7_segments)
-    #     print self.vbox.itemAt(0)
-    #     print self.vbox.itemAt(1)
-    #     print self.vbox.itemAt(2)
-    #     print self.vbox.itemAt(3)
-    #     self.vbox.insertLayout(4, self.vbox.itemAt(3))
-    #     self.wid.setLayout(self.vbox)
-    #     # self.list_of_message_boxes = self.set_message_boxes()
-    #     # for each_vbox in self.list_of_message_boxes:
-    #     #     self.vbox.addLayout(each_vbox)
-
-    #     # self.vbox.addWidget(self.tabs)
-     
-    #     # self.vbox.addLayout(self.apane)
-        
-    #     # self.wid.setLayout(self.vbox)
-        
+            self.update_settings(cfg_window_settings)
+    
 
     def update_Menu_Table(self):
+        #Need to add code to update the table even when no tabs exist
         if not self.hl7_dropdown_menu_items:
             self.hl7_dropdown_menu_items = Hl7_menu()
-        self.hl7_dropdown_menu_items.create_dropdown_items_from_dict(configurationbox_segments)
+
+        self.hl7_dropdown_menu_items.create_dropdown_items_from_dict(self.current_configurationbox_segments_data)
 
         for i in xrange(len(self.tabs)):            
             widg  = self.tabs.widget(i).layout()
@@ -203,6 +221,9 @@ class Gui(QtGui.QMainWindow):
             
                 self.make_hl7Menu(dropdown,menu,self.hl7_dropdown_menu_items.hl7_dropdown_dict)
                 dropdown.setMenu(menu)
+
+        return True
+
         
         
         
@@ -281,7 +302,7 @@ class Gui(QtGui.QMainWindow):
         
         self.wid.setLayout(self.vbox)
 
-    def make_hl7Menu(self,dropdown,menu,hl7_dictionary):      
+    def make_hl7Menu(self,dropdown,menu,hl7_dictionary): 
         for key in hl7_dictionary:
             if key == " ":
                 action = menu.addAction(key)
@@ -342,7 +363,7 @@ class Gui(QtGui.QMainWindow):
     def sheets_to_import(self, sheetnames):
         '''Will return a list of sheets to be considered from the excel sheet'''
 
-        sheets_not_to_import = ["Template Cover Sheet", "Summary", "General", "Report", "Comparison_Report"]
+        sheets_not_to_import = deepcopy(QE_INPUT_SHEETS_TO_DISCARD)
 
         for sheet in sheetnames:
             matchObj = re.match( r'OUTPUT_\w+', sheet, re.I)
