@@ -1,18 +1,24 @@
 import os
 import logging
 from PyQt4 import QtGui, QtCore
+from PyQt4.QtCore import pyqtSlot
 import pandas as pd
 import xlrd
 import img_qr
 from cfg_win import Configuration_Window
 import re
 from hl7menu import Hl7_menu
+from collections import OrderedDict
 from create_hl7_data import Create_Hl7_Data
 from config import configurationbox_segments, default_hl7_segments, obr_7_timestamp
 
 logging.basicConfig(level=logging.DEBUG,
                     format='[%(threadName)s] %(message)s',
 )
+
+
+COMPANY_NAME = "CapsuleTech"
+APPLICATION_NAME = "MainWindow"
 
 class Gui(QtGui.QMainWindow):
     
@@ -24,6 +30,10 @@ class Gui(QtGui.QMainWindow):
         self.xfile     = None
         self.tabs      = QtGui.QTabWidget()
         self.fname     = ''
+        self.configuration_window = None
+
+        
+
         
         self.hl7_dropdown_menu_items = None
         
@@ -32,9 +42,18 @@ class Gui(QtGui.QMainWindow):
         self.non_obx_message_variables = [1190, 2583, 5815, 5816]
 
         self.initWindow()
-        self.initMenu()        
+        self.initMenu() 
+        self.load_settings()       
         self.initPage()                
         self.runWindow()
+
+
+    def load_settings(self):
+        '''Loads the default settings'''
+        # Creates a Qsetting object with default settings
+        self.default_settings = QtCore.QSettings(COMPANY_NAME, APPLICATION_NAME) 
+        self.default_settings.setValue('HL7_segments', default_hl7_segments)
+        self.default_settings.setValue('Configurationbox_segments', configurationbox_segments)
         
 
     def initWindow(self):    
@@ -103,40 +122,71 @@ class Gui(QtGui.QMainWindow):
         self.setWindowIcon(QtGui.QIcon(':/tool.png'))
         self.show()
 
-        
+
+    def self.update_settings(self, default_settings, cfg_window_settings):
+        '''Will look at the differences between the current settings configured by the user and the default settings and apply changes wherever necessary'''
+         pass           
+        # sg = cfg_window_settings.value('HL7_segments', type = str)
+        # print sg
+
+        # current_configurationbox = cfg_window_settings.value('Configurationbox_segments').toPyObject()
+        # current_configurationbox_segments = OrderedDict()
+        # for key, value in current_configurationbox.items():
+        #     current_configurationbox_segments[str(key)] = value
+
+        # print current_configurationbox_segments
+
     def open_configuration_window(self):
-        self.dialog = Configuration_Window(self)
-        self.dialog.exec_()
-        #print configurationbox_segments
-        self.post_config_update()
+        default_settings = self.default_settings
+
+        if self.configuration_window is None:
+            self.configuration_window = Configuration_Window(default_settings)
+ 
+        if self.configuration_window.exec_():
+            cfg_window_settings = self.configuration_window.get_current_settings()
+            self.update_settings(default_settings, cfg_window_settings)
+
+   
+
+        # hl7_segment_setting_values = settings_to_load.value('Configurationbox_segments').toPyObject()
+        # hl7_segment_setting_values_dict = OrderedDict()
+        # for key, value in hl7_segment_setting_values.items():
+        #     hl7_segment_setting_values_dict[str(key)] = value
+
+
+        #     settings = QtCore.QSettings(self.configuration_window.hl7_segment_boxes())
+
+        # self.setSettingsObject(settings)
+ 
+        #self.post_config_update()
         
 
-    def post_config_update(self):
-        self.statusBar().showMessage('Wait! Applying config changes')
-        # after making config changes re populate table        
-        self.update_Menu_Table()
-        #self.update_vboxes()
-        self.statusBar().showMessage('Ready')
+    # def post_config_update(self):
+    #     self.statusBar().showMessage('Wait! Applying config changes')
+    #     # after making config changes re populate table        
+    #     self.update_Menu_Table()
+    #     #self.update_vboxes()
+    #     self.statusBar().showMessage('Ready')
 
 
-    def update_vboxes(self):
-        '''Updates the static header boxes'''
-        print len(default_hl7_segments)
-        print self.vbox.itemAt(0)
-        print self.vbox.itemAt(1)
-        print self.vbox.itemAt(2)
-        print self.vbox.itemAt(3)
-        self.vbox.insertLayout(4, self.vbox.itemAt(3))
-        self.wid.setLayout(self.vbox)
-        # self.list_of_message_boxes = self.set_message_boxes()
-        # for each_vbox in self.list_of_message_boxes:
-        #     self.vbox.addLayout(each_vbox)
+    # def update_vboxes(self):
+    #     '''Updates the static header boxes'''
+    #     print len(default_hl7_segments)
+    #     print self.vbox.itemAt(0)
+    #     print self.vbox.itemAt(1)
+    #     print self.vbox.itemAt(2)
+    #     print self.vbox.itemAt(3)
+    #     self.vbox.insertLayout(4, self.vbox.itemAt(3))
+    #     self.wid.setLayout(self.vbox)
+    #     # self.list_of_message_boxes = self.set_message_boxes()
+    #     # for each_vbox in self.list_of_message_boxes:
+    #     #     self.vbox.addLayout(each_vbox)
 
-        # self.vbox.addWidget(self.tabs)
+    #     # self.vbox.addWidget(self.tabs)
      
-        # self.vbox.addLayout(self.apane)
+    #     # self.vbox.addLayout(self.apane)
         
-        # self.wid.setLayout(self.vbox)
+    #     # self.wid.setLayout(self.vbox)
         
 
     def update_Menu_Table(self):
