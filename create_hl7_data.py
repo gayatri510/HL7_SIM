@@ -27,7 +27,26 @@ class Create_Hl7_Data():
         self.count = 0
         self.current_time = datetime.now()
 
-       
+        # --------------- WILL HAVE TO MOVE TO THE CONFIG SECTION ONLY AND NOT BE PRESENT HERE
+        self.header_variables = OrderedDict([('6510', 'MSH-3'),
+                                ('7914', 'MSH-3-1'),
+                                ('1911', 'MSH-3-2'),
+                                ('6511', 'MSH-4'),
+                                ('6512', 'MSH-5'),
+                                ('6513', 'MSH-6'),                                      
+                                ('2255', 'MSH-7'),
+                                ('9569', 'PID-3'),
+                                ('1929', 'PID-3-1'),                                        
+                                ('1930', 'PID-5'),
+                                ('8340', 'PID-5-1'),
+                                ('2901', 'PID-5-2'),
+                                ('1220', 'PID-7'),
+                                ('170',  'PID-8'),
+                                ('8036', 'PID-18'),   
+                                ('6521', 'PV1-2'),
+                                ('9593', 'OBR-2'),
+                                ('8102', 'OBR-3')                                   
+                                ])
 
 
     def set_hl7segments_count(self, segments_and_count_dict_values):
@@ -200,7 +219,7 @@ class Create_Hl7_Data():
 
 
 
-    def read_excel_data(self, excel_sheet, sheet_to_read_from, data_table):
+    def read_excel_data(self, excel_sheet, sheet_to_read_from, data_table, var_list = None):
         ''' This method will read data from the excel sheet into a pandas data frame and also read the data from the table on the tool'''
 
 
@@ -210,6 +229,8 @@ class Create_Hl7_Data():
 
         df_actual = excel_sheet.parse(sheet_to_read_from)
         self.df = excel_sheet.parse(sheet_to_read_from, converters= {col: str for col in df_actual.columns.values.tolist()})
+
+        self.remove_variables_from_list(var_list)
 
 
         # Traverse through each row of the table, get the column 0 and 1 strings and if an HL7 segment mapping exists, then
@@ -235,6 +256,7 @@ class Create_Hl7_Data():
 
     def generate_hl7_message_data(self):
         ''' This method will create a dictionary which will have all the data necessary to generate the simulation file'''
+        self.non_obx_variables_list = []
 
         # Once the sheet is ready with the respective columns and the header segment information is also obtained,
         # traverse through each row of the excel sheet and update the self.hl7_dict_values dictionary with each OBX/PID/PV1/OBR messages etc.
@@ -257,62 +279,94 @@ class Create_Hl7_Data():
 
 
         for _, row_entry in self.df.iterrows():
-            self.hl7_dict_values_each_msg = {}
-            self.hl7_dict_values_each_msg = copy.deepcopy(self.hl7_dict_values)
+            if row_entry['Capsule Variable ID'] in self.header_variables.keys():
+                try:
+                    self.non_obx_variables_list.append((row_entry['Capsule Variable ID'], row_entry['Value'], row_entry['NodeID']))
+                except KeyError:
+                    self.non_obx_variables_list.append((row_entry['Capsule Variable ID'], row_entry['Value'], row_entry['PV1-3']))
+                
+                # do something different
+            else:
+                self.hl7_dict_values_each_msg = {}
+                self.hl7_dict_values_each_msg = copy.deepcopy(self.hl7_dict_values)
+                for item in self.mapping_list:
+                    row_value = row_entry[item].strip()
+                    if row_value != row_value:
+                        row_value = ""
 
-            for item in self.mapping_list:
-                row_value = row_entry[item].strip()
-                if row_value != row_value:
-                    row_value = ""
-
-                mapping_list_components =  item.split('-')
-
-                # Check for the length of the list. If it is 4, it implies it is in the format of ex: OBX-3-1-1
-                if len(mapping_list_components) == 4:
-                    self.hl7_dict_values_each_msg[mapping_list_components[0]][int(mapping_list_components[1])][int(mapping_list_components[2])].append(row_value)
+                    mapping_list_components =  item.split('-')
 
 
-                # Check for the length of the list. If it is 3, it implies it is in the format of ex: OBX-3-1
-                if len(mapping_list_components) == 3:
-                    subcomponents_list = row_value.split('&')
-                    # Case where OBX-3-1 is in format of 1&2
-                    if len(subcomponents_list) > 0:
-                        self.hl7_dict_values_each_msg[mapping_list_components[0]][int(mapping_list_components[1])][int(mapping_list_components[2])] = subcomponents_list
-                    # Case where OBX-3-1 is in format of 1
-                    else:
-                        self.hl7_dict_values_each_msg[mapping_list_components[0]][int(mapping_list_components[1])][int(mapping_list_components[2])] = row_value
+                    # Check for the length of the list. If it is 4, it implies it is in the format of ex: OBX-3-1-1
+                    if len(mapping_list_components) == 4:
+                        self.hl7_dict_values_each_msg[mapping_list_components[0]][int(mapping_list_components[1])][int(mapping_list_components[2])].append(row_value)
+
+                    # Check for the length of the list. If it is 3, it implies it is in the format of ex: OBX-3-1
+                    if len(mapping_list_components) == 3:
+                        subcomponents_list = row_value.split('&')
+                        # Case where OBX-3-1 is in format of 1&2
+                        if len(subcomponents_list) > 0:
+                            self.hl7_dict_values_each_msg[mapping_list_components[0]][int(mapping_list_components[1])][int(mapping_list_components[2])] = subcomponents_list
+
+                        # Case where OBX-3-1 is in format of 1
+                        else:
+                            self.hl7_dict_values_each_msg[mapping_list_components[0]][int(mapping_list_components[1])][int(mapping_list_components[2])] = row_value
                           
-                # Check for the length of the list. If it is 2, it implies it is in the format of ex: OBX-3
-                # It can be in the format of 1^2 or 1&2^3&4 or just 1, all three cases have to be covered
-                if len(mapping_list_components) == 2:
-                    components_list = row_value.split('^')
+                
+                    # Check for the length of the list. If it is 2, it implies it is in the format of ex: OBX-3
+                    # It can be in the format of 1^2 or 1&2^3&4 or just 1, all three cases have to be covered
+                    if len(mapping_list_components) == 2:
+                        components_list = row_value.split('^')
 
-                    # Case 1: OBX-3 is in format of 1
-                    if len(components_list) == 0:
-                        self.hl7_dict_values_each_msg[mapping_list_components[0]][int(mapping_list_components[1])][1] = row_value
 
-                    # Case 2: OBX-3 is in format of 1^2 or 1&2^3 or 1&2^3&4
-                    if (len(components_list) > 0):
-                        for each_comp_index, each_comp in enumerate(components_list):
-                            subcomponents = each_comp.split('&')
+                        # Case 1: OBX-3 is in format of 1
+                        if len(components_list) == 0:
+                            self.hl7_dict_values_each_msg[mapping_list_components[0]][int(mapping_list_components[1])][1] = row_value
 
-                            if len(subcomponents) == 0:
-                                self.hl7_dict_values_each_msg[mapping_list_components[0]][int(mapping_list_components[1])][each_comp_index + 1] = each_comp
-                            else:
-                                self.hl7_dict_values_each_msg[mapping_list_components[0]][int(mapping_list_components[1])][each_comp_index + 1] = subcomponents
+                        # Case 2: OBX-3 is in format of 1^2 or 1&2^3 or 1&2^3&4
+                        if (len(components_list) > 0):
+                            for each_comp_index, each_comp in enumerate(components_list):
+                                subcomponents = each_comp.split('&')
+
+                                if len(subcomponents) == 0:
+                                    self.hl7_dict_values_each_msg[mapping_list_components[0]][int(mapping_list_components[1])][each_comp_index + 1] = each_comp
+                                else:
+                                    self.hl7_dict_values_each_msg[mapping_list_components[0]][int(mapping_list_components[1])][each_comp_index + 1] = subcomponents
 
                 
 
-            # Traverse through each row of the sheet, obtain the Unique ID (in this case Node ID is used) and append that
-            # hl7_dict_values dictionary to the appropriate list associated with that Unique ID
-            try:
-                message_id = str(row_entry['NodeID'])
-            except KeyError:
-                message_id = str(row_entry['PV1-3'])
+                # Traverse through each row of the sheet, obtain the Unique ID (in this case Node ID is used) and append that
+                # hl7_dict_values dictionary to the appropriate list associated with that Unique ID
+                try:
+                    message_id = str(row_entry['NodeID'])
+                except KeyError:
+                    message_id = str(row_entry['PV1-3'])
 
-            self.hl7_file_message[message_id].append(self.hl7_dict_values_each_msg)
+                self.hl7_file_message[message_id].append(self.hl7_dict_values_each_msg)
 
-            self.hl7_file_message = OrderedDict(sorted(self.hl7_file_message.items(), key=lambda t: t[0])) 
+                self.hl7_file_message = OrderedDict(sorted(self.hl7_file_message.items(), key=lambda t: t[0])) 
+
+        # Insert the non-obx variables in the self.hl7_file_message before returning it 
+        for caps_var_id, value_to_set, nodeid_loc in self.non_obx_variables_list:
+            # Handles the case where the header is in the format of MSH-3-1
+            if len(self.header_variables[caps_var_id].split('-')) == 3:
+                header, field, comp = self.header_variables[caps_var_id].split('-')
+                subcomp_list = self.hl7_file_message[nodeid_loc][0][header][int(field)][int(comp)]
+                del subcomp_list[:]
+                subcomp_list.append(value_to_set)
+                self.hl7_file_message[nodeid_loc][0][header][int(field)][int(comp)] = subcomp_list
+            # Handles the case where the header is in the format of PID-8
+            else:
+                header, field = self.header_variables[caps_var_id].split('-')
+                subcomp_list = self.hl7_file_message[nodeid_loc][0][header][int(field)][1]
+                print subcomp_list
+                if subcomp_list is None:
+                    subcomp_list.append(value_to_set)
+                else:
+                    del subcomp_list[:]
+                    subcomp_list.append(value_to_set)
+                self.hl7_file_message[nodeid_loc][0][header][int(field)][1] = subcomp_list
+
 
         return self.hl7_file_message
 
