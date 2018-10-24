@@ -12,25 +12,25 @@ COMPANY_NAME = "CapsuleTech"
 
 class Configuration_Window(QtGui.QDialog):
 
-
-
     def __init__(self, settings_to_load, parent=None):
         super(Configuration_Window, self).__init__()
 
-        self.cfg_window_settings = None
+        self.cfg_window_settings = QtCore.QSettings(COMPANY_NAME, "Configuration_Window") 
 
 
         #Obtain the settings to load from the Main Window class and load the default settings
         self.default_hl7_segments = settings_to_load.value('HL7_segments', type = str)
    
-
         default_hl7_segment_setting_values = settings_to_load.value('Configurationbox_segments').toPyObject()
         self.default_hl7_segment_setting_values_dict = OrderedDict()
         for key, value in default_hl7_segment_setting_values.items():
             self.default_hl7_segment_setting_values_dict[str(key)] = value
- 
+
+        default_obr7_timestamp_state = settings_to_load.value('OBR 7 timestamp').toBool()
+        default_obx14_timestamp_state = settings_to_load.value('OBX 14 timestamp').toBool()
 
 
+        # Create actions and widgets
         msg_label = QtGui.QLabel("HL7 Segments")
         self.msg_linedit = QtGui.QLineEdit()
         self.msg_linedit.setText(self.default_hl7_segments)
@@ -67,15 +67,16 @@ class Configuration_Window(QtGui.QDialog):
         tableLayout.addWidget(self.table)
         self.tableGroupBox.setLayout(tableLayout)
 
-
-
+    
         self.obr7_timestamp_checkbox = QtGui.QCheckBox("Generate Timestamp In OBR-7 field",self)
-        self.obr_timestamp_state = "UnChecked"
-        # #self.obr7_timestamp_checkbox.stateChanged.connect(self.click_obr_timestamp_checkBox)
+        self.obr7_timestamp_checkbox.setChecked(default_obr7_timestamp_state)
+        self.cfg_window_settings.setValue('OBR 7 timestamp', default_obr7_timestamp_state)
+        self.obr7_timestamp_checkbox.stateChanged.connect(self.obr7_timestamp_statechange)
 
         self.obx14_timestamp_checkbox = QtGui.QCheckBox("Generate Timestamp In OBX-14 field",self)
-        self.obx_timestamp_state = "UnChecked"
-        # #self.obx14_timestamp_checkbox.stateChanged.connect(self.click_obx_timestamp_checkBox)
+        self.obx14_timestamp_checkbox.setChecked(default_obx14_timestamp_state)
+        self.cfg_window_settings.setValue('OBX 14 timestamp', default_obx14_timestamp_state)
+        self.obx14_timestamp_checkbox.stateChanged.connect(self.obx14_timestamp_statechange)
 
         self.buttonBox = QtGui.QDialogButtonBox(QtGui.QDialogButtonBox.Ok | QtGui.QDialogButtonBox.Cancel)
         self.buttonBox.accepted.connect(self.accept)
@@ -95,31 +96,22 @@ class Configuration_Window(QtGui.QDialog):
         self.resize(650, 400)
 
 
-    #     self.obr7_timestamp_checkbox = QtGui.QCheckBox("Generate Timestamp In OBR-7 field",self)
-    #     self.obr_timestamp_state = "UnChecked"
-    #     self.obr7_timestamp_checkbox.stateChanged.connect(self.click_obr_timestamp_checkBox)
-
-    #     self.obx14_timestamp_checkbox = QtGui.QCheckBox("Generate Timestamp In OBX-14 field",self)
-    #     self.obx_timestamp_state = "UnChecked"
-    #     self.obx14_timestamp_checkbox.stateChanged.connect(self.click_obx_timestamp_checkBox)
-
-    #     '''
-    #     action pane
-    #     '''  
-  
- 
-
-    def compare_hl7_segments(self, original, current):
-        ''' Compares the original and current HL7 segments'''
-        original_hl7_segment_list = original.split(',')
-        current_hl7_segment_list = map(str, current.split(','))
-        return bool(set(current_hl7_segment_list).difference(original_hl7_segment_list))
+    def obr7_timestamp_statechange(self):
+        if self.obr7_timestamp_checkbox.isChecked() == True:
+            self.obr7_timestamp_checkbox.setChecked(True)
+            self.cfg_window_settings.setValue('OBR 7 timestamp', True)
+        else:
+            self.obr7_timestamp_checkbox.setChecked(False)
+            self.cfg_window_settings.setValue('OBR 7 timestamp', False)
 
 
-    def compare_hl7_configurationbox_segment_values(self, original_dict, current_dict):
-        '''Compares the original and current configuration box segment values'''
-        return bool(set(current_dict.items()).difference(original_dict.items()))
-
+    def obx14_timestamp_statechange(self):
+        if self.obx14_timestamp_checkbox.isChecked() == True:
+            self.obx14_timestamp_checkbox.setChecked(True)
+            self.cfg_window_settings.setValue('OBX 14 timestamp', True)
+        else:
+            self.obx14_timestamp_checkbox.setChecked(False)
+            self.cfg_window_settings.setValue('OBX 14 timestamp', False)
 
 
     def get_current_settings(self):
@@ -132,7 +124,7 @@ class Configuration_Window(QtGui.QDialog):
 
 
         # Grab the HL7 configurationbox segment dictionary values and compare to see if anything changed
-        current_configurationbox_segments = OrderedDict(self.default_hl7_segment_setting_values_dict)
+        current_configurationbox_segments = deepcopy(self.default_hl7_segment_setting_values_dict)
 
         for row in range(0,self.table.rowCount()):
             column0_text = str(self.table.cellWidget(row,0).text())
@@ -144,31 +136,4 @@ class Configuration_Window(QtGui.QDialog):
 
         self.cfg_window_settings.setValue('Configurationbox_segments', current_configurationbox_segments)
 
-
         return self.cfg_window_settings
-
-        # # Grab the checkbox state for the OBR-7 timestamp checkbox
-        # if self.obr_timestamp_state == "Checked":
-        #     add_obr_timestamp = True
-
-
-        # # Grab the checkbox state for the OBR-7 timestamp checkbox
-        # if self.obx_timestamp_state == "Checked":
-        #     add_obx_timestamp = True
-
-
-        # return (update_hl7_segment_boxes, update_hl7_menu, add_obr_timestamp, add_obx_timestamp)
-
-
-
-
-
-
-
-
-
-    #     # # Will have to modify the dropdown hl7 menu list once the configurationbox_segments dictionary is updated
-    #     # hl7_dropdown_menu_items = Hl7_menu()
-    #     # hl7_dropdown_menu_items.create_dropdown_items_from_dict(current_configurationbox_segments)
-
-        #self.close()
