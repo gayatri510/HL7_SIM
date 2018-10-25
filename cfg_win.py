@@ -19,26 +19,6 @@ class Configuration_Window(QtGui.QDialog):
 
         # ------------ THE BELOW TWO HAVE TO BE MOVED TO CONFIG.PY AND ADDED TO LOAD SETTINGS AND OTHER STUFF
         self.default_calculated_variables = "1190, 2583, 5815, 5816"
-        self.header_variables = OrderedDict([('6510', 'MSH-3'),
-                                ('7914', 'MSH-3-1'),
-                                ('1911', 'MSH-3-2'),
-                                ('6511', 'MSH-4'),
-                                ('6512', 'MSH-5'),
-                                ('6513', 'MSH-6'),                                      
-                                ('2255', 'MSH-7'),
-                                ('9569', 'PID-3'),
-                                ('1929', 'PID-3-1'),                                        
-                                ('1930', 'PID-5'),
-                                ('8340', 'PID-5-1'),
-                                ('2901', 'PID-5-2'),
-                                ('1220', 'PID-7'),
-                                ('170',  'PID-8'),
-                                ('8036', 'PID-18'),   
-                                ('6521', 'PV1-2'),
-                                ('9593', 'OBR-2'),
-                                ('8102', 'OBR-3')                                   
-                                ])
-
 
 
         #Obtain the settings to load from the Main Window class and load the default settings
@@ -48,6 +28,14 @@ class Configuration_Window(QtGui.QDialog):
         self.default_hl7_segment_setting_values_dict = OrderedDict()
         for key, value in default_hl7_segment_setting_values.items():
             self.default_hl7_segment_setting_values_dict[str(key)] = value
+
+
+        default_header_variable_values = settings_to_load.value('Header Variables').toPyObject()
+        self.default_header_variable_values_dict = OrderedDict()
+        for key, value in default_header_variable_values.items():
+            self.default_header_variable_values_dict[key] = str(value)
+
+        print self.default_header_variable_values_dict
 
         default_obr7_timestamp_state = settings_to_load.value('OBR 7 timestamp').toBool()
         default_obx14_timestamp_state = settings_to_load.value('OBX 14 timestamp').toBool()
@@ -87,10 +75,6 @@ class Configuration_Window(QtGui.QDialog):
         self.table.horizontalHeader().setResizeMode(1, QtGui.QHeaderView.ResizeToContents)
         self.table.horizontalHeader().setStretchLastSection(True)
 
-
-
-
-
         self.tableGroupBox = QtGui.QGroupBox("HL7 Segment Default Settings")
         tableLayout = QtGui.QVBoxLayout()
         tableLayout.addWidget(self.table)
@@ -101,19 +85,17 @@ class Configuration_Window(QtGui.QDialog):
         self.headervariablesGroupBox = QtGui.QGroupBox("Header Variables")
  
         self.headervariablesTable = QtGui.QTableWidget()
+        self.headervariablesTable.horizontalHeader().setVisible(False)
+        self.headervariablesTable.verticalHeader().setVisible(False)
         self.headervariablesTable.setColumnCount(2)
-        self.headervariablesTable.setRowCount(len(self.header_variables) + 10)
+        self.headervariablesTable.setRowCount(len(self.default_header_variable_values_dict) + 10)
 
 
-        for n, key in enumerate(self.header_variables.keys()):
-            self.headervariablesTable.setItem(n,0, QtGui.QTableWidgetItem(key))
-            self.headervariablesTable.setItem(n,1, QtGui.QTableWidgetItem(self.header_variables[key]))
+        for row_item, key in enumerate(self.default_header_variable_values_dict.keys()):
+            self.headervariablesTable.setItem(row_item,0, QtGui.QTableWidgetItem(key))
+            self.headervariablesTable.setItem(row_item,1, QtGui.QTableWidgetItem(self.default_header_variable_values_dict[key]))
 
 
-
-        print self.headervariablesTable.itemAt(0, 0).text()
-        print self.headervariablesTable.itemAt(1, 0).text()
-        print self.headervariablesTable.itemAt(2, 0).text()
 
 
         self.headervariablesTable.setHorizontalHeaderLabels(("Capsule Variable ID", "Header Description"))
@@ -206,18 +188,18 @@ class Configuration_Window(QtGui.QDialog):
 
         self.cfg_window_settings.setValue('Configurationbox_segments', current_configurationbox_segments)
 
-        print self.headervariablesTable.itemAt(0, 0).text()
-        print self.headervariablesTable.itemAt(1, 0).text()
-        print self.headervariablesTable.itemAt(2, 0).text()
-        print self.headervariablesTable.itemAt(3, 0).text()
+        # Grab the Header variables dictionary from the header variables list
+        current_header_variable_dict = OrderedDict() 
+
+        for hd_row in range(0,self.headervariablesTable.rowCount()):
+            try:
+                hd_key = self.headervariablesTable.item(hd_row , 0).text()
+                hd_value = self.headervariablesTable.item(hd_row , 1).text()
+                current_header_variable_dict[hd_key] = hd_value
+            except AttributeError:       # If the table contents in that row are empty, then ignore
+                pass
 
 
-
-        # for row in range(0, self.headervariablesTable.rowCount()):
-        #     print row
-        #     column0_text = self.headervariablesTable.itemAt(row, 0).text()
-        #     column1_text = self.headervariablesTable.itemAt(row, 1).text()
-        #     print column0_text, column1_text
-
+        self.cfg_window_settings.setValue('Header Variables', current_header_variable_dict)
 
         return self.cfg_window_settings
