@@ -11,7 +11,7 @@ from copy import deepcopy
 from hl7menu import Hl7_menu
 from collections import OrderedDict
 from create_hl7_data import Create_Hl7_Data
-from config import configurationbox_segments, default_hl7_segments, obr_7_timestamp_default_state, obx_14_timestamp_default_state, HEADER_VARIABLES
+from config import configurationbox_segments, default_hl7_segments, obr_7_timestamp_default_state, obx_14_timestamp_default_state, HEADER_VARIABLES, DEFAULT_CALCULATED_VARIABLES
 
 logging.basicConfig(level=logging.DEBUG,
                     format='[%(threadName)s] %(message)s',
@@ -50,6 +50,7 @@ class Gui(QtGui.QMainWindow):
         self.default_settings.setValue('HL7_segments', default_hl7_segments)
         self.default_settings.setValue('Configurationbox_segments', configurationbox_segments)
         self.default_settings.setValue('Header Variables', HEADER_VARIABLES)
+        self.default_settings.setValue('Calculated Variables', DEFAULT_CALCULATED_VARIABLES)
         self.default_settings.setValue('OBR 7 timestamp', obr_7_timestamp_default_state)
         self.default_settings.setValue('OBX 14 timestamp', obx_14_timestamp_default_state)
 
@@ -123,7 +124,7 @@ class Gui(QtGui.QMainWindow):
         self.show()
 
 
-    def update_main_window(self, update_hl7segments_tabs = False, update_hl7_configurationbox_menu = False, update_obr_timestamp = False, update_obx_timestamp = False, update_header_variables_list  = False):
+    def update_main_window(self, update_hl7segments_tabs = False, update_hl7_configurationbox_menu = False, update_obr_timestamp = False, update_obx_timestamp = False, update_header_variables_list  = False, update_calculated_variables = False):
         ''' Applies the changed settings to the main window'''
         self.statusBar().showMessage('Wait! Applying config changes')
         if update_hl7_configurationbox_menu == True:
@@ -156,13 +157,20 @@ class Gui(QtGui.QMainWindow):
         update_obr_timestamp = False
         update_obx_timestamp = False
         update_header_variables_list  = False
+        update_calculated_variables = False
 
         # Grabs the HL7 Segments data and compares with the defaults to see if it changed
         self.current_hl7_segment_data = cfg_window_settings.value('HL7_segments', type = str)
         if self.compare_list_values(default_hl7_segments, self.current_hl7_segment_data):
             print "Yes HL7 segments changed"
             update_hl7segments_tabs = True
-            #self.update_hl7_segments()
+
+        # Grabs the Calculated Variables data and compares with the defaults to see if it changed
+        self.current_calculated_variables_data = cfg_window_settings.value('Calculated Variables', type = str)
+        if self.compare_list_values(DEFAULT_CALCULATED_VARIABLES, self.current_calculated_variables_data):
+            print "Yes Calculated Variables have changed"
+            update_calculated_variables = True
+ 
 
         # Grabs the HL7 segment configuration box data and compares with the defaults to see if it changed
         current_configurationbox_data = cfg_window_settings.value('Configurationbox_segments').toPyObject()
@@ -191,9 +199,11 @@ class Gui(QtGui.QMainWindow):
 
         self.current_header_variables_data_dict = OrderedDict()
         for key, value in current_header_variables_data.items():
-             self.current_header_variables_data_dict[str(key)] = value
+             self.current_header_variables_data_dict[str(key)] = str(value)
 
         if  self.compare_dict_values(HEADER_VARIABLES, self.current_header_variables_data_dict):
+            print HEADER_VARIABLES
+            print self.current_header_variables_data_dict
             print "Yes Header variables changed"
             update_header_variables_list  = True
 
