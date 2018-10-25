@@ -17,13 +17,12 @@ class Configuration_Window(QtGui.QDialog):
 
         self.cfg_window_settings = QtCore.QSettings(COMPANY_NAME, "Configuration_Window") 
 
-        # ------------ THE BELOW TWO HAVE TO BE MOVED TO CONFIG.PY AND ADDED TO LOAD SETTINGS AND OTHER STUFF
-        self.default_calculated_variables = "1190, 2583, 5815, 5816"
-
-
         #Obtain the settings to load from the Main Window class and load the default settings
         self.default_hl7_segments = settings_to_load.value('HL7_segments', type = str)
-   
+        self.default_calculated_variables = settings_to_load.value('Calculated Variables', type = str)
+        print self.default_calculated_variables
+
+
         default_hl7_segment_setting_values = settings_to_load.value('Configurationbox_segments').toPyObject()
         self.default_hl7_segment_setting_values_dict = OrderedDict()
         for key, value in default_hl7_segment_setting_values.items():
@@ -35,7 +34,6 @@ class Configuration_Window(QtGui.QDialog):
         for key, value in default_header_variable_values.items():
             self.default_header_variable_values_dict[key] = str(value)
 
-        print self.default_header_variable_values_dict
 
         default_obr7_timestamp_state = settings_to_load.value('OBR 7 timestamp').toBool()
         default_obx14_timestamp_state = settings_to_load.value('OBX 14 timestamp').toBool()
@@ -94,8 +92,6 @@ class Configuration_Window(QtGui.QDialog):
         for row_item, key in enumerate(self.default_header_variable_values_dict.keys()):
             self.headervariablesTable.setItem(row_item,0, QtGui.QTableWidgetItem(key))
             self.headervariablesTable.setItem(row_item,1, QtGui.QTableWidgetItem(self.default_header_variable_values_dict[key]))
-
-
 
 
         self.headervariablesTable.setHorizontalHeaderLabels(("Capsule Variable ID", "Header Description"))
@@ -173,6 +169,10 @@ class Configuration_Window(QtGui.QDialog):
         # Grab HL7 segment changes and compare to see if anything changed
         current_hl7_segments = self.msg_linedit.text()
         self.cfg_window_settings.setValue('HL7_segments', current_hl7_segments)
+
+        # Grab calculated variables list and compare to see if anything changed
+        current_calculated_variables = self.calculated_variables.text()
+        self.cfg_window_settings.setValue('Calculated Variables', current_calculated_variables)
 
 
         # Grab the HL7 configurationbox segment dictionary values and compare to see if anything changed
