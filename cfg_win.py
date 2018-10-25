@@ -64,9 +64,7 @@ class Configuration_Window(QtGui.QDialog):
         self.table = QtGui.QTableWidget()
         self.table.horizontalHeader().setVisible(False)
         self.table.verticalHeader().setVisible(False)
-        self.table.horizontalHeader().setResizeMode(0, QtGui.QHeaderView.Stretch)
-        self.table.horizontalHeader().setResizeMode(1, QtGui.QHeaderView.Stretch)
-        self.table.horizontalHeader().resizeSection(1, 180)            
+           
         self.table.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
         
         # This will populate the table with the contents in the xcolumns list and the number of columns are always set to 2 
@@ -84,6 +82,13 @@ class Configuration_Window(QtGui.QDialog):
             self.table.setCellWidget(index, 0, message_label)
             self.table.setCellWidget(index, 1, message_box_information)
             index = index + 1
+
+        self.table.horizontalHeader().setResizeMode(0, QtGui.QHeaderView.Stretch)
+        self.table.horizontalHeader().setResizeMode(1, QtGui.QHeaderView.ResizeToContents)
+        self.table.horizontalHeader().setStretchLastSection(True)
+
+
+
 
 
         self.tableGroupBox = QtGui.QGroupBox("HL7 Segment Default Settings")
