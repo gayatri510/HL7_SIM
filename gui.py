@@ -11,7 +11,6 @@ from copy import deepcopy
 from hl7menu import Hl7_menu
 from collections import OrderedDict
 from create_hl7_data import Create_Hl7_Data
-from config import configurationbox_segments, default_hl7_segments, obr_7_timestamp_default_state, obx_14_timestamp_default_state, HEADER_VARIABLES, DEFAULT_CALCULATED_VARIABLES
 
 logging.basicConfig(level=logging.DEBUG,
                     format='[%(threadName)s] %(message)s',
@@ -21,7 +20,46 @@ logging.basicConfig(level=logging.DEBUG,
 COMPANY_NAME = "CapsuleTech"
 APPLICATION_NAME = "MainWindow"
 QE_INPUT_SHEETS_TO_DISCARD = ["Template Cover Sheet", "Summary", "General", "Report", "Comparison_Report"]
-default_calculated_variables = "1190, 2583, 5815, 5816"
+DEFAULT_HL7_SEGMENTS = "MSH, PID, PV1, OBR"
+DEFAULT_CALCULATED_VARIABLES = "1190, 2583, 5815, 5816"
+DEFAULT_CONFIGURATIONBOX_SEGMENTS_DATA = OrderedDict([('MSH Field Count', '17'),
+                                                      ('MSH Component Count', '10'),
+                                                      ('MSH Subcomponent Count', '5'),
+                                                      ('PID Field Count', '17'),
+                                                      ('PID Component Count', '10'),
+                                                      ('PID Subcomponent Count', '5'),                                      
+                                                      ('PV1 Field Count', '17'),
+                                                      ('PV1 Component Count', '10'),
+                                                      ('PV1 Subcomponent Count', '5'),                                        
+                                                      ('OBR Field Count', '17'),
+                                                      ('OBR Component Count', '10'),
+                                                      ('OBR Subcomponent Count', '5'),
+                                                      ('OBX Field Count', '17'),
+                                                      ('OBX Component Count', '10'),
+                                                      ('OBX Subcomponent Count', '5')
+])
+HEADER_VARIABLES = OrderedDict([('6510', 'MSH-3'),
+                                ('7914', 'MSH-3-1'),
+                                ('1911', 'MSH-3-2'),
+                                ('6511', 'MSH-4'),
+                                ('6512', 'MSH-5'),
+                                ('6513', 'MSH-6'),                                      
+                                ('2255', 'MSH-7'),
+                                ('9569', 'PID-3'),
+                                ('1929', 'PID-3-1'),                                        
+                                ('1930', 'PID-5'),
+                                ('8340', 'PID-5-1'),
+                                ('2901', 'PID-5-2'),
+                                ('1220', 'PID-7'),
+                                ('170',  'PID-8'),
+                                ('8036', 'PID-18'),   
+                                ('6521', 'PV1-2'),
+                                ('9593', 'OBR-2'),
+                                ('8102', 'OBR-3')                                   
+                                ])
+
+OBR_7_TIMESTAMP_DEFAULT_STATE  = True
+OBX_14_TIMESTAMP_DEFAULT_STATE = True
 
 class Gui(QtGui.QMainWindow):
     
@@ -31,11 +69,13 @@ class Gui(QtGui.QMainWindow):
         self.app       = app
         self.wid       = None
         self.xfile     = None
+        self.headers   = QtGui.QVBoxLayout()
         self.tabs      = QtGui.QTabWidget()
+        self.vbox      = QtGui.QVBoxLayout()
         self.fname     = ''
         self.configuration_window = None      
         self.hl7_dropdown_menu_items = None
-        
+
         self.initWindow()
         self.initMenu() 
         self.load_settings()       
@@ -47,15 +87,23 @@ class Gui(QtGui.QMainWindow):
         '''Loads the default settings'''
         # Creates a Qsetting object with default settings
         self.default_settings = QtCore.QSettings(COMPANY_NAME, APPLICATION_NAME) 
-        self.default_settings.setValue('HL7_segments', default_hl7_segments)
-        self.default_settings.setValue('Configurationbox_segments', configurationbox_segments)
+        self.default_settings.setValue('HL7_segments', DEFAULT_HL7_SEGMENTS)
+        self.default_settings.setValue('Configurationbox_segments', DEFAULT_CONFIGURATIONBOX_SEGMENTS_DATA)
         self.default_settings.setValue('Header Variables', HEADER_VARIABLES)
         self.default_settings.setValue('Calculated Variables', DEFAULT_CALCULATED_VARIABLES)
-        self.default_settings.setValue('OBR 7 timestamp', obr_7_timestamp_default_state)
-        self.default_settings.setValue('OBX 14 timestamp', obx_14_timestamp_default_state)
+        self.default_settings.setValue('OBR 7 timestamp', OBR_7_TIMESTAMP_DEFAULT_STATE)
+        self.default_settings.setValue('OBX 14 timestamp', OBX_14_TIMESTAMP_DEFAULT_STATE)
 
         self.default_settings.sync()
-
+        
+        # also load gui object with default settings
+        # This is a list of HL7 segments, fields and the default number of values for each field
+        self.current_configurationbox_segments_data = DEFAULT_CONFIGURATIONBOX_SEGMENTS_DATA
+        self.current_hl7_segment_data = DEFAULT_HL7_SEGMENTS
+        self.current_calculated_variables_data = DEFAULT_CALCULATED_VARIABLES
+        self.obr_7_timestamp_state = OBR_7_TIMESTAMP_DEFAULT_STATE
+        self.obx_14_timestamp_state = OBX_14_TIMESTAMP_DEFAULT_STATE                                                      
+        self.current_header_variables_data_dict = HEADER_VARIABLES
         
     def initWindow(self):    
         logging.debug("initializing window") 
@@ -133,6 +181,9 @@ class Gui(QtGui.QMainWindow):
             else:
                 pass
                 # Write code for an exception that might have occurred
+        if update_hl7segments_tabs == True:
+            if self.update_hl7_segment_boxes() == True:
+                self.statusBar().showMessage('Done! HL7 segment boxes have been updated with the applied configuration settings')
         else:
             pass
 
@@ -160,54 +211,57 @@ class Gui(QtGui.QMainWindow):
         update_calculated_variables = False
 
         # Grabs the HL7 Segments data and compares with the defaults to see if it changed
-        self.current_hl7_segment_data = cfg_window_settings.value('HL7_segments', type = str)
-        if self.compare_list_values(default_hl7_segments, self.current_hl7_segment_data):
+        new_hl7_segment_data = cfg_window_settings.value('HL7_segments', type = str)
+        if self.compare_list_values(new_hl7_segment_data, self.current_hl7_segment_data):
             print "Yes HL7 segments changed"
             update_hl7segments_tabs = True
+            self.current_hl7_segment_data = new_hl7_segment_data
 
         # Grabs the Calculated Variables data and compares with the defaults to see if it changed
-        self.current_calculated_variables_data = cfg_window_settings.value('Calculated Variables', type = str)
-        if self.compare_list_values(DEFAULT_CALCULATED_VARIABLES, self.current_calculated_variables_data):
+        new_calculated_variables_data = cfg_window_settings.value('Calculated Variables', type = str)
+        if self.compare_list_values(new_calculated_variables_data, self.current_calculated_variables_data):
             print "Yes Calculated Variables have changed"
             update_calculated_variables = True
+            self.current_calculated_variables_data = new_calculated_variables_data
  
-
         # Grabs the HL7 segment configuration box data and compares with the defaults to see if it changed
-        current_configurationbox_data = cfg_window_settings.value('Configurationbox_segments').toPyObject()
-        self.current_configurationbox_segments_data = OrderedDict()
-        for key, value in current_configurationbox_data.items():
-             self.current_configurationbox_segments_data[str(key)] = value
+        new_configurationbox_data = cfg_window_settings.value('Configurationbox_segments').toPyObject()
+        new_configurationbox_segments_data = OrderedDict()
+        for key, value in new_configurationbox_data.items():
+             new_configurationbox_segments_data[str(key)] = value
 
-        if  self.compare_dict_values(configurationbox_segments, self.current_configurationbox_segments_data):
+        if  self.compare_dict_values(new_configurationbox_segments_data, self.current_configurationbox_segments_data):
             print "Yes HL7 Menubox changed"
             update_hl7_configurationbox_menu = True
+            self.current_configurationbox_segments_data = new_configurationbox_segments_data
 
 
         # Grabs the OBR7 and OBX14 checkbox states and compares with the defaults to see if they changed
-        self.obr_7_timestamp_state = cfg_window_settings.value('OBR 7 timestamp').toBool()
-        if (obr_7_timestamp_default_state ^ self.obr_7_timestamp_state):
+        new_obr_7_timestamp_state = cfg_window_settings.value('OBR 7 timestamp').toBool()
+        if (new_obr_7_timestamp_state ^ self.obr_7_timestamp_state):
             print "OBR 7 changed"
             update_obr_timestamp = True
+            self.obr_7_timestamp_state = new_obr_7_timestamp_state
 
-        self.obx_14_timestamp_state = cfg_window_settings.value('OBX 14 timestamp').toBool()
-        if (obx_14_timestamp_default_state ^ self.obx_14_timestamp_state):
+        new_obx_14_timestamp_state = cfg_window_settings.value('OBX 14 timestamp').toBool()
+        if (new_obx_14_timestamp_state ^ self.obx_14_timestamp_state):
             print "OBX 14 changed"
             update_obx_timestamp = True
+            self.obx_14_timestamp_state = new_obx_14_timestamp_state
 
         # Grabs the header variables list and compares with the defaults to see if they changed
-        current_header_variables_data = cfg_window_settings.value('Header Variables').toPyObject()
+        new_header_variables_data = cfg_window_settings.value('Header Variables').toPyObject()
 
-        self.current_header_variables_data_dict = OrderedDict()
-        for key, value in current_header_variables_data.items():
-             self.current_header_variables_data_dict[str(key)] = str(value)
+        new_header_variables_data_dict = OrderedDict()
+        for key, value in new_header_variables_data.items():
+             new_header_variables_data_dict[str(key)] = str(value)
 
-        if  self.compare_dict_values(HEADER_VARIABLES, self.current_header_variables_data_dict):
+        if  self.compare_dict_values(new_header_variables_data_dict, self.current_header_variables_data_dict):
             print HEADER_VARIABLES
             print self.current_header_variables_data_dict
             print "Yes Header variables changed"
             update_header_variables_list  = True
-
-
+            self.current_header_variables_data_dict = new_header_variables_data_dict
 
 
         # Once it determines what settings have been changed, the appropriate settings will only be applied to the mainwindow
@@ -249,40 +303,30 @@ class Gui(QtGui.QMainWindow):
         
     def set_message_boxes(self):
 
-        self.list_of_message_boxes = []
         self.list_of_message_information = []
 
-        self.messagebox_segments = default_hl7_segments.split(",")
+        self.messagebox_segments = self.current_hl7_segment_data.split(",")
 
 
         # self.messagebox.segments is statically defined in the init function
         # as self.messagebox_segments = ['MSH - Message Header Segment', 'PID - Patient Identification Segment', 'PV1 Segment - Patient Visit Information Segment', 'OBR - Observation Request Segment'] 
 
         for each_message in self.messagebox_segments:
-            message_box = QtGui.QVBoxLayout()
             message_label = QtGui.QLabel(each_message)
             self.message_box_information = QtGui.QLineEdit()
-            message_box.addWidget(message_label)
-            message_box.addWidget(self.message_box_information)  
-            self.list_of_message_boxes.append(message_box)
+            self.headers.addWidget(message_label)
+            self.headers.addWidget(self.message_box_information)  
             self.list_of_message_information.append(self.message_box_information)
 
 
-        return self.list_of_message_boxes
-
-
     def initPage(self):        
-        logging.debug("Setting Page") 
-
-
-        self.vbox = QtGui.QVBoxLayout()
- 
+        logging.debug("Setting Page")  
 
         '''
         Message boxes
         '''
         # This function will generate, initialize mulitple message/vbox widgets with the appropriate labels and return the list of the boxes to be laid out
-        self.list_of_message_boxes = self.set_message_boxes()
+        self.set_message_boxes()
 
         '''
         action pane
@@ -312,12 +356,8 @@ class Gui(QtGui.QMainWindow):
         '''
         Page Layout
         '''        
-        # The following lists the order in which the page will be laid out. First the message boxes are placed, following the table followed by the buttons
-        for each_vbox in self.list_of_message_boxes:
-            self.vbox.addLayout(each_vbox)
-
-        self.vbox.addWidget(self.tabs)
-     
+        self.vbox.addLayout(self.headers)
+        self.vbox.addWidget(self.tabs)     
         self.vbox.addLayout(self.apane)
         
         self.wid.setLayout(self.vbox)
@@ -407,7 +447,7 @@ class Gui(QtGui.QMainWindow):
 
         if not self.hl7_dropdown_menu_items:
             self.hl7_dropdown_menu_items = Hl7_menu()
-        self.hl7_dropdown_menu_items.create_dropdown_items_from_dict(configurationbox_segments)
+        self.hl7_dropdown_menu_items.create_dropdown_items_from_dict(self.current_configurationbox_segments_data)
 
         # for each sheet create a tab and populate with a table
         tables  = []
@@ -511,6 +551,17 @@ class Gui(QtGui.QMainWindow):
         print self.final_hl7_message
 
 
+    def update_hl7_segment_boxes(self):
+        while (self.headers.count() != 0):
+            widg = self.headers.itemAt(0).widget()
+            self.headers.removeWidget(widg)
+            widg.setParent(None)
+        
+        self.set_message_boxes()
+
+        return True
+
+    
     def setMapping_hl7(self):
         '''This will perform the Mapping of the Columns to the different HL7 segments and Generate the HL7 file'''
 
