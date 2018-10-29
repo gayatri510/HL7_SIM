@@ -27,27 +27,6 @@ class Create_Hl7_Data():
         self.count = 0
         self.current_time = datetime.now()
 
-        # --------------- WILL HAVE TO MOVE TO THE CONFIG SECTION ONLY AND NOT BE PRESENT HERE
-        self.header_variables = OrderedDict([('6510', 'MSH-3'),
-                                ('7914', 'MSH-3-1'),
-                                ('1911', 'MSH-3-2'),
-                                ('6511', 'MSH-4'),
-                                ('6512', 'MSH-5'),
-                                ('6513', 'MSH-6'),                                      
-                                ('2255', 'MSH-7'),
-                                ('9569', 'PID-3'),
-                                ('1929', 'PID-3-1'),                                        
-                                ('1930', 'PID-5'),
-                                ('8340', 'PID-5-1'),
-                                ('2901', 'PID-5-2'),
-                                ('1220', 'PID-7'),
-                                ('170',  'PID-8'),
-                                ('8036', 'PID-18'),   
-                                ('6521', 'PV1-2'),
-                                ('9593', 'OBR-2'),
-                                ('8102', 'OBR-3')                                   
-                                ])
-
 
     def set_hl7segments_count(self, segments_and_count_dict_values):
         ''' This method will get the segments' fields, components and subcomponents values and set it for other methods to use'''
@@ -218,8 +197,14 @@ class Create_Hl7_Data():
 
 
 
+    def remove_variables_from_list(self, var_list):
+        ''' This will remove the variables from the variables_list list from the pandas dataframe'''
 
-    def read_excel_data(self, excel_sheet, sheet_to_read_from, data_table, var_list = None):
+        for var_id in var_list:
+            self.df = self.df[self.df['Capsule Variable ID'] != str(var_id)]
+
+
+    def read_excel_data(self, excel_sheet, sheet_to_read_from, data_table, calculated_var_list = None, non_obx_variables_dict = None):
         ''' This method will read data from the excel sheet into a pandas data frame and also read the data from the table on the tool'''
 
 
@@ -230,7 +215,10 @@ class Create_Hl7_Data():
         df_actual = excel_sheet.parse(sheet_to_read_from)
         self.df = excel_sheet.parse(sheet_to_read_from, converters= {col: str for col in df_actual.columns.values.tolist()})
 
-        self.remove_variables_from_list(var_list)
+        #Remove the calculated and non_obx Capsule Variable IDs that will not be part of the OBX messages
+        self.remove_variables_from_list(calculated_var_list)
+        self.non_obx_variables_dict = non_obx_variables_dict
+        # self.remove_variables_from_list(map(int, self.non_obx_variables_dict.keys()))
 
 
         # Traverse through each row of the table, get the column 0 and 1 strings and if an HL7 segment mapping exists, then
@@ -248,11 +236,6 @@ class Create_Hl7_Data():
             self.df.to_excel("Renamed_QE_sheet.xlsx", index=False)
 
 
-    def remove_variables_from_list(self, var_list):
-        ''' This will remove the variables from the variables_list list from the pandas dataframe'''
-
-        for var_id in var_list:
-            self.df = self.df[self.df['Capsule Variable ID'] != str(var_id)]
 
     def generate_hl7_message_data(self):
         ''' This method will create a dictionary which will have all the data necessary to generate the simulation file'''
@@ -268,31 +251,44 @@ class Create_Hl7_Data():
         except KeyError:
             unique_message_ids = map(str, self.df['PV1-3'].unique())
 
-        #print unique_message_ids
-
-
         # Create a big message_dictionary whose key will be the unique Node ID 
         self.hl7_file_message = defaultdict(list)
         for unique_msg_id in unique_message_ids:
             self.hl7_file_message[unique_msg_id] = []
 
 
-
         for _, row_entry in self.df.iterrows():
-            if row_entry['Capsule Variable ID'] in self.header_variables.keys():
+            if row_entry['Capsule Variable ID'] in self.non_obx_variables_dict.keys():
                 try:
-                    self.non_obx_variables_list.append((row_entry['Capsule Variable ID'], row_entry['Value'], row_entry['NodeID']))
+                    self.non_obx_variables_list.append((row_entry['Capsule Variable ID'], row_entry['Value HL7']))
                 except KeyError:
-                    self.non_obx_variables_list.append((row_entry['Capsule Variable ID'], row_entry['Value'], row_entry['PV1-3']))
+                    try:
+                        self.non_obx_variables_list.append((row_entry['Capsule Variable ID'], row_entry['Value CLBS']))
+                    except KeyError:
+                        try:
+                            self.non_obx_variables_list.append((row_entry['Capsule Variable ID'], row_entry['Value']))
+                        except KeyError:
+                            try:
+                                self.non_obx_variables_list.append((row_entry['Capsule Variable ID'], row_entry['OBX-5']))
+                            except KeyError:
+                                self.non_obx_variables_list.append((row_entry['Capsule Variable ID'], row_entry['OBX-5-1']))
                 
-                # do something different
             else:
                 self.hl7_dict_values_each_msg = {}
                 self.hl7_dict_values_each_msg = copy.deepcopy(self.hl7_dict_values)
                 for item in self.mapping_list:
-                    row_value = row_entry[item].strip()
-                    if row_value != row_value:
+                    # Grab the value from that particular column except if it is empty, an Attribute Error is thrown, then set it to ""
+                    try:
+                        row_value = row_entry[item].strip()
+                    except AttributeError:
                         row_value = ""
+
+                    try:
+                        dt = datetime.strptime(row_value, "%m/%d/%Y - %H:%M:%S.%f")
+                        row_value = dt.strftime("%Y%m%d%H%M%S")
+                    except ValueError:
+                        pass
+
 
                     mapping_list_components =  item.split('-')
 
@@ -347,25 +343,26 @@ class Create_Hl7_Data():
                 self.hl7_file_message = OrderedDict(sorted(self.hl7_file_message.items(), key=lambda t: t[0])) 
 
         # Insert the non-obx variables in the self.hl7_file_message before returning it 
-        for caps_var_id, value_to_set, nodeid_loc in self.non_obx_variables_list:
+        for num, var_value_tuple in enumerate(self.non_obx_variables_list):
             # Handles the case where the header is in the format of MSH-3-1
-            if len(self.header_variables[caps_var_id].split('-')) == 3:
-                header, field, comp = self.header_variables[caps_var_id].split('-')
-                subcomp_list = self.hl7_file_message[nodeid_loc][0][header][int(field)][int(comp)]
+            if len(self.non_obx_variables_dict[var_value_tuple[0]].split('-')) == 3:
+                header, field, comp = self.non_obx_variables_dict[var_value_tuple[0]].split('-')
+                nodeid_curr = list(self.hl7_file_message.keys())[num]
+                subcomp_list = self.hl7_file_message[nodeid_curr][0][header][int(field)][int(comp)]
                 del subcomp_list[:]
-                subcomp_list.append(value_to_set)
-                self.hl7_file_message[nodeid_loc][0][header][int(field)][int(comp)] = subcomp_list
+                subcomp_list.append(var_value_tuple[1])
+                self.hl7_file_message[nodeid_curr][0][header][int(field)][int(comp)] = subcomp_list
             # Handles the case where the header is in the format of PID-8
             else:
-                header, field = self.header_variables[caps_var_id].split('-')
-                subcomp_list = self.hl7_file_message[nodeid_loc][0][header][int(field)][1]
-                print subcomp_list
-                if subcomp_list is None:
-                    subcomp_list.append(value_to_set)
+                header, field = self.non_obx_variables_dict[var_value_tuple[0]].split('-')
+                nodeid_curr = list(self.hl7_file_message.keys())[num]
+                subcomp_list = self.hl7_file_message[nodeid_curr][0][header][int(field)][1]
+                if not subcomp_list:
+                    subcomp_list.append(var_value_tuple[1])
                 else:
                     del subcomp_list[:]
-                    subcomp_list.append(value_to_set)
-                self.hl7_file_message[nodeid_loc][0][header][int(field)][1] = subcomp_list
+                    subcomp_list.append(var_value_tuple[1])
+                self.hl7_file_message[nodeid_curr][0][header][int(field)][1] = subcomp_list
 
 
         return self.hl7_file_message
@@ -449,7 +446,7 @@ class Create_Hl7_Data():
 
 
 
-    def get_obr_data(self, dictionary_item):
+    def get_obr_data(self, dictionary_item, obr_timestamp_state = False):
         ''' Gets the OBR segment '''
         obr_comp_list = []
         
@@ -465,16 +462,17 @@ class Create_Hl7_Data():
                     elif len(field_values) > 1:
                         obr_subcomp_list.append(self.subcomponent_separator.join(field_values))
             obr_comp_list.append(self.component_separator.join(obr_subcomp_list))
-        
+
         # Setting timestamp from the current timestamp + 1s delay for every OBR segment (OBR-7 is the timestamp field)
-        self.current_time = self.current_time + timedelta(seconds = 1)
-        obr_comp_list[6] = "%d%d%d%d%d%d" % (self.current_time.year, self.current_time.month, self.current_time.day, self.current_time.hour, self.current_time.minute, self.current_time.second)
+        if obr_timestamp_state == True:
+            self.current_time = self.current_time + timedelta(seconds = 1)
+            obr_comp_list[6] = "%d%d%d%d%d%d" % (self.current_time.year, self.current_time.month, self.current_time.day, self.current_time.hour, self.current_time.minute, self.current_time.second)
 
         obr_result = self.remove_trailing_field_seperators("OBR|" + self.field_separator.join(obr_comp_list))
 
         return obr_result
 
-    def get_obx_data(self, dictionary_item):
+    def get_obx_data(self, dictionary_item, obx_timestamp_state = False):
         ''' Gets the OBX segment '''
         obx_comp_list = []
         
@@ -492,8 +490,9 @@ class Create_Hl7_Data():
             obx_comp_list.append(self.component_separator.join(obx_subcomp_list))
 
         # Setting timestamp from the current timestamp + 1s delay for every OBX segment (OBX-14 is the timestamp field)
-        self.current_time = self.current_time + timedelta(seconds = 1)
-        obx_comp_list[13] = "%d%d%d%d%d%d" % (self.current_time.year, self.current_time.month, self.current_time.day, self.current_time.hour, self.current_time.minute, self.current_time.second)
+        if obx_timestamp_state == True:
+            self.current_time = self.current_time + timedelta(seconds = 1)
+            obx_comp_list[13] = "%d%d%d%d%d%d" % (self.current_time.year, self.current_time.month, self.current_time.day, self.current_time.hour, self.current_time.minute, self.current_time.second)
 
         obx_result = self.remove_trailing_field_seperators("OBX|" + self.field_separator.join(obx_comp_list))
 
