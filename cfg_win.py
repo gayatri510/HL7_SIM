@@ -20,7 +20,6 @@ class Configuration_Window(QtGui.QDialog):
         #Obtain the settings to load from the Main Window class and load the default settings
         self.default_hl7_segments = settings_to_load.value('HL7_segments', type = str)
         self.default_calculated_variables = settings_to_load.value('Calculated Variables', type = str)
-        print self.default_calculated_variables
 
 
         default_hl7_segment_setting_values = settings_to_load.value('Configurationbox_segments').toPyObject()
