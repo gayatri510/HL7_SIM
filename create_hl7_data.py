@@ -6,6 +6,8 @@ import pandas as pd
 import xlrd
 import copy
 from datetime import datetime, timedelta
+from itertools import cycle
+
 
 
 class Create_Hl7_Data():
@@ -232,9 +234,7 @@ class Create_Hl7_Data():
                 self.mapping_list.append(column1_text)
                 self.df.rename(columns={column0_text : column1_text},inplace=True)
 
-            # # Optionally rename this into a different sheet for debugging purposes later
-            self.df.to_excel("Renamed_QE_sheet.xlsx", index=False)
-
+        self.df.to_excel("Renamed.xlsx", index=False)    
 
 
     def generate_hl7_message_data(self):
@@ -250,6 +250,7 @@ class Create_Hl7_Data():
             unique_message_ids = map(str, self.df['NodeID'].unique())
         except KeyError:
             unique_message_ids = map(str, self.df['PV1-3'].unique())
+        self.num_of_unique_ids = len(unique_message_ids)
 
         # Create a big message_dictionary whose key will be the unique Node ID 
         self.hl7_file_message = defaultdict(list)
@@ -342,27 +343,48 @@ class Create_Hl7_Data():
 
                 self.hl7_file_message = OrderedDict(sorted(self.hl7_file_message.items(), key=lambda t: t[0])) 
 
+
+        # Remove the non_obx_variables from the list once their values are obtained for further computation
+        self.remove_variables_from_list([tupleelement[0] for tupleelement in self.non_obx_variables_list])
+        # Remove PV1-3 / NodeID/ 1931 variable from the self.non_obx_variables_list if any else it will incorrectly override any existing NodeIDs and mess up the messages
+        self.non_obx_variables_list = [i for i in self.non_obx_variables_list if i[0] == '1931']
+
+        myIterator = cycle(range(self.num_of_unique_ids))
+        
         # Insert the non-obx variables in the self.hl7_file_message before returning it 
-        for num, var_value_tuple in enumerate(self.non_obx_variables_list):
-            # Handles the case where the header is in the format of MSH-3-1
-            if len(self.non_obx_variables_dict[var_value_tuple[0]].split('-')) == 3:
-                header, field, comp = self.non_obx_variables_dict[var_value_tuple[0]].split('-')
-                nodeid_curr = list(self.hl7_file_message.keys())[num]
-                subcomp_list = self.hl7_file_message[nodeid_curr][0][header][int(field)][int(comp)]
-                del subcomp_list[:]
-                subcomp_list.append(var_value_tuple[1])
-                self.hl7_file_message[nodeid_curr][0][header][int(field)][int(comp)] = subcomp_list
-            # Handles the case where the header is in the format of PID-8
-            else:
-                header, field = self.non_obx_variables_dict[var_value_tuple[0]].split('-')
-                nodeid_curr = list(self.hl7_file_message.keys())[num]
-                subcomp_list = self.hl7_file_message[nodeid_curr][0][header][int(field)][1]
-                if not subcomp_list:
-                    subcomp_list.append(var_value_tuple[1])
+        for caps_id, var_value in self.non_obx_variables_list:
+            nodeid_curr = list(self.hl7_file_message.keys())[myIterator.next()]
+
+            # Check for the length of the list. If it is 3, it implies it is in the format of ex: PID-3-1
+            if len(self.non_obx_variables_dict[caps_id].split('-')) == 3:
+                header, field, comp = self.non_obx_variables_dict[caps_id].split('-') 
+                subcomponents_list = var_value.split('&')
+                # Case where PID-3-1 is in format of 1&2
+                if len(subcomponents_list) > 0:
+                    self.hl7_file_message[nodeid_curr][0][header][int(field)][int(comp)] = subcomponents_list
+                # Case where OBX-3-1 is in format of 1
                 else:
-                    del subcomp_list[:]
-                    subcomp_list.append(var_value_tuple[1])
-                self.hl7_file_message[nodeid_curr][0][header][int(field)][1] = subcomp_list
+                    self.hl7_file_message[nodeid_curr][0][header][int(field)][int(comp)] = var_value
+
+        
+            # Check for the length of the list. If it is 2, it implies it is in the format of ex: PV1-3
+            # It can be in the format of 1^2 or 1&2^3&4 or just 1, all three cases have to be covered
+            if len(self.non_obx_variables_dict[caps_id].split('-')) == 2:
+                header, field = self.non_obx_variables_dict[caps_id].split('-') 
+                components_list = var_value.split('^')
+
+                # Case 1: PV1-3 is in format of 'ICU'
+                if len(components_list) == 0:
+                    self.hl7_file_message[nodeid_curr][0][header][int(field)][1] = var_value
+
+                # Case 2: PV1-3 is in format of 1^2 or 1&2^3 or 1&2^3&4
+                if (len(components_list) > 0):
+                    for each_comp_index, each_comp in enumerate(components_list):
+                        subcomponents = each_comp.split('&')
+                        if len(subcomponents) == 0:
+                            self.hl7_file_message[nodeid_curr][0][header][int(field)][each_comp_index + 1] = each_comp
+                        else:
+                            self.hl7_file_message[nodeid_curr][0][header][int(field)][each_comp_index + 1] = subcomponents
 
 
         return self.hl7_file_message
@@ -472,7 +494,7 @@ class Create_Hl7_Data():
 
         return obr_result
 
-    def get_obx_data(self, dictionary_item, obx_timestamp_state = False):
+    def get_obx_data(self, dictionary_item, obx_timestamp_state = False, df_index_to_write = None):
         ''' Gets the OBX segment '''
         obx_comp_list = []
         
@@ -489,10 +511,18 @@ class Create_Hl7_Data():
                         obx_subcomp_list.append(self.subcomponent_separator.join(field_values))
             obx_comp_list.append(self.component_separator.join(obx_subcomp_list))
 
+        self.count = self.count + 1
+        obx_comp_list[0] = str(self.count)
+
         # Setting timestamp from the current timestamp + 1s delay for every OBX segment (OBX-14 is the timestamp field)
         if obx_timestamp_state == True:
             self.current_time = self.current_time + timedelta(seconds = 1)
             obx_comp_list[13] = "%d%d%d%d%d%d" % (self.current_time.year, self.current_time.month, self.current_time.day, self.current_time.hour, self.current_time.minute, self.current_time.second)
+
+            try:
+                self.df.loc[df_index_to_write, "MeasurementTime"] = self.current_time.strftime("%m/%d/%Y - %H:%M:%S")
+            except AttributeError:
+                pass # Add error handling
 
         obx_result = self.remove_trailing_field_seperators("OBX|" + self.field_separator.join(obx_comp_list))
 
