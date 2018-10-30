@@ -11,6 +11,7 @@ from copy import deepcopy
 from hl7menu import Hl7_menu
 from collections import OrderedDict
 from create_hl7_data import Create_Hl7_Data
+from itertools import cycle
 
 logging.basicConfig(level=logging.DEBUG,
                     format='[%(threadName)s] %(message)s',
@@ -38,28 +39,29 @@ DEFAULT_CONFIGURATIONBOX_SEGMENTS_DATA = OrderedDict([('MSH Field Count', '17'),
                                                       ('OBX Component Count', '10'),
                                                       ('OBX Subcomponent Count', '5')
 ])
-HEADER_VARIABLES = OrderedDict([('6510', 'MSH-3'),
-                                ('7914', 'MSH-3-1'),
+HEADER_VARIABLES = OrderedDict([('170',  'PID-8'),
+                                ('1220', 'PID-7'),
                                 ('1911', 'MSH-3-2'),
-                                ('6511', 'MSH-4'),
-                                ('6512', 'MSH-5'),
-                                ('6513', 'MSH-6'),                                      
-                                ('2255', 'MSH-7'),
-                                ('9569', 'PID-3'),
                                 ('1929', 'PID-3-1'),                                        
                                 ('1930', 'PID-5'),
-                                ('8340', 'PID-5-1'),
+                                ('1931', 'PV1-3'),
+                                ('2255', 'MSH-7'),
                                 ('2901', 'PID-5-2'),
-                                ('1220', 'PID-7'),
-                                ('170',  'PID-8'),
-                                ('8036', 'PID-18'),   
+                                ('6510', 'MSH-3'),                                                              
+                                ('6511', 'MSH-4'),
+                                ('6512', 'MSH-5'),
+                                ('6513', 'MSH-6'), 
                                 ('6521', 'PV1-2'),
+                                ('7914', 'MSH-3-1'),
+                                ('8102', 'OBR-3'),
+                                ('8036', 'PID-18'),     
+                                ('8340', 'PID-5-1'),
                                 ('9593', 'OBR-2'),
-                                ('8102', 'OBR-3')                                   
+                                ('9569', 'PID-3'), 
                                 ])
 
-OBR_7_TIMESTAMP_DEFAULT_STATE  = True
-OBX_14_TIMESTAMP_DEFAULT_STATE = True
+OBR_7_TIMESTAMP_DEFAULT_STATE  = False
+OBX_14_TIMESTAMP_DEFAULT_STATE = False
 
 class Gui(QtGui.QMainWindow):
     
@@ -101,8 +103,8 @@ class Gui(QtGui.QMainWindow):
         self.current_configurationbox_segments_data = DEFAULT_CONFIGURATIONBOX_SEGMENTS_DATA
         self.current_hl7_segment_data = DEFAULT_HL7_SEGMENTS
         self.current_calculated_variables_data = DEFAULT_CALCULATED_VARIABLES
-        self.obr_7_timestamp_state = OBR_7_TIMESTAMP_DEFAULT_STATE
-        self.obx_14_timestamp_state = OBX_14_TIMESTAMP_DEFAULT_STATE                                                      
+        self.current_obr_7_timestamp_state = OBR_7_TIMESTAMP_DEFAULT_STATE
+        self.current_obx_14_timestamp_state = OBX_14_TIMESTAMP_DEFAULT_STATE                                                      
         self.current_header_variables_data_dict = HEADER_VARIABLES
         
     def initWindow(self):    
@@ -175,6 +177,7 @@ class Gui(QtGui.QMainWindow):
     def update_main_window(self, update_hl7segments_tabs = False, update_hl7_configurationbox_menu = False, update_obr_timestamp = False, update_obx_timestamp = False, update_header_variables_list  = False, update_calculated_variables = False):
         ''' Applies the changed settings to the main window'''
         self.statusBar().showMessage('Wait! Applying config changes')
+
         if update_hl7_configurationbox_menu == True:
             if self.update_Menu_Table() == True:
                 self.statusBar().showMessage('Done! The Table has been updated with the applied configuration settings')
@@ -190,8 +193,8 @@ class Gui(QtGui.QMainWindow):
 
     def compare_list_values(self, original, current):
         ''' Compares the original and current HL7 segments'''
-        original_hl7_segment_list = original.split(',')
-        current_hl7_segment_list = map(str, current.split(','))
+        original_hl7_segment_list = [x.strip() for x in map(str, original.split(','))]
+        current_hl7_segment_list = [y.strip() for y in map(str, current.split(','))]
         return bool(set(current_hl7_segment_list).difference(original_hl7_segment_list))
 
 
@@ -212,14 +215,14 @@ class Gui(QtGui.QMainWindow):
 
         # Grabs the HL7 Segments data and compares with the defaults to see if it changed
         new_hl7_segment_data = cfg_window_settings.value('HL7_segments', type = str)
-        if self.compare_list_values(new_hl7_segment_data, self.current_hl7_segment_data):
+        if self.compare_list_values(self.current_hl7_segment_data, new_hl7_segment_data):
             print "Yes HL7 segments changed"
             update_hl7segments_tabs = True
             self.current_hl7_segment_data = new_hl7_segment_data
 
         # Grabs the Calculated Variables data and compares with the defaults to see if it changed
         new_calculated_variables_data = cfg_window_settings.value('Calculated Variables', type = str)
-        if self.compare_list_values(new_calculated_variables_data, self.current_calculated_variables_data):
+        if self.compare_list_values(self.current_calculated_variables_data, new_calculated_variables_data):
             print "Yes Calculated Variables have changed"
             update_calculated_variables = True
             self.current_calculated_variables_data = new_calculated_variables_data
@@ -230,7 +233,7 @@ class Gui(QtGui.QMainWindow):
         for key, value in new_configurationbox_data.items():
              new_configurationbox_segments_data[str(key)] = value
 
-        if  self.compare_dict_values(new_configurationbox_segments_data, self.current_configurationbox_segments_data):
+        if  self.compare_dict_values(self.current_configurationbox_segments_data, new_configurationbox_segments_data):
             print "Yes HL7 Menubox changed"
             update_hl7_configurationbox_menu = True
             self.current_configurationbox_segments_data = new_configurationbox_segments_data
@@ -238,16 +241,16 @@ class Gui(QtGui.QMainWindow):
 
         # Grabs the OBR7 and OBX14 checkbox states and compares with the defaults to see if they changed
         new_obr_7_timestamp_state = cfg_window_settings.value('OBR 7 timestamp').toBool()
-        if (new_obr_7_timestamp_state ^ self.obr_7_timestamp_state):
+        if (new_obr_7_timestamp_state ^ self.current_obr_7_timestamp_state):
             print "OBR 7 changed"
             update_obr_timestamp = True
-            self.obr_7_timestamp_state = new_obr_7_timestamp_state
+            self.current_obr_7_timestamp_state = new_obr_7_timestamp_state
 
         new_obx_14_timestamp_state = cfg_window_settings.value('OBX 14 timestamp').toBool()
-        if (new_obx_14_timestamp_state ^ self.obx_14_timestamp_state):
+        if (new_obx_14_timestamp_state ^ self.current_obx_14_timestamp_state):
             print "OBX 14 changed"
             update_obx_timestamp = True
-            self.obx_14_timestamp_state = new_obx_14_timestamp_state
+            self.current_obx_14_timestamp_state = new_obx_14_timestamp_state
 
         # Grabs the header variables list and compares with the defaults to see if they changed
         new_header_variables_data = cfg_window_settings.value('Header Variables').toPyObject()
@@ -426,7 +429,7 @@ class Gui(QtGui.QMainWindow):
         sheets_not_to_import = deepcopy(QE_INPUT_SHEETS_TO_DISCARD)
 
         for sheet in sheetnames:
-            matchObj = re.match( r'OUTPUT_\w+', sheet, re.I)
+            matchObj = re.match( r'OUTPUT_.+', sheet, re.I)
             if matchObj:
                 sheets_not_to_import.append(matchObj.group())
 
@@ -491,6 +494,14 @@ class Gui(QtGui.QMainWindow):
                 self.make_hl7Menu(dropdown,menu,self.hl7_dropdown_menu_items.hl7_dropdown_dict)
                 dropdown.setMenu(menu)
                 
+                # If the NodeID exists in the columns of the excel sheet, then statically set it to PV1-3
+                if label.text() == "NodeID":
+                    dropdown.setText("PV1-3")
+                else:
+                    pass
+                    # Make it like a pop up that either aborts the tool or allows the user to say okay and continue to add one manually
+                    #self.load_popup("No NodeID column found in the QE Input Sheet")
+                
                 table_contents.append((label,dropdown))
 
             # This populates the table with table_contents's contents in the given row and cell.o
@@ -524,7 +535,7 @@ class Gui(QtGui.QMainWindow):
         ''' This runs all the setup necessary to build the sim files'''
 
         self.create_hl7_dict_values = Create_Hl7_Data()
-        self.create_hl7_dict_values.set_hl7segments_count(configurationbox_segments)
+        self.create_hl7_dict_values.set_hl7segments_count(self.current_configurationbox_segments_data)
 
         # Obtain the texts and map them to the respective HL7 Segmenclsts
         self.create_hl7_dict_values.split_message_box_segments(self.list_of_message_information)
@@ -536,19 +547,12 @@ class Gui(QtGui.QMainWindow):
         self.sheetab_string = str(self.tabs.tabText (self.tabs.currentIndex()))
         sheettab_table = self.tabs.currentWidget().layout().itemAt(0).widget()
 
-        var_list = map(int, default_calculated_variables.split(','))
+        calculated_var_list = map(int, self.current_calculated_variables_data.split(','))
 
-        self.create_hl7_dict_values.read_excel_data(self.xfile, self.sheetab_string, sheettab_table, var_list)
-
-        # # This will remove any variables that dont have to be part of the HL7 message like the I:E ratio variables etc
-        # # The variables are listed in two lists one is the self.msg_header_variables and self.non_obx_message_variables
-        # self.create_hl7_dict_values.remove_variables_from_list(map(int, default_calculated_variables.split(',')))
-        #self.create_hl7_dict_values.remove_variables_from_list(self.msg_header_variables)
+        self.create_hl7_dict_values.read_excel_data(self.xfile, self.sheetab_string, sheettab_table, calculated_var_list, self.current_header_variables_data_dict)
 
         # Generates a dictionary with all the data that can now be written to a file
         self.final_hl7_message = self.create_hl7_dict_values.generate_hl7_message_data()
-
-        print self.final_hl7_message
 
 
     def update_hl7_segment_boxes(self):
@@ -564,10 +568,6 @@ class Gui(QtGui.QMainWindow):
     
     def setMapping_hl7(self):
         '''This will perform the Mapping of the Columns to the different HL7 segments and Generate the HL7 file'''
-
-
-        # -----------------------TO DO : CREATE A DICTIONARY WITH EACH KEY AS THE DIFFERENT FIELDS AND VALUES AS EMPTY ---------------------------------
-
 
         # # Makes sure that when the Map button is clicked, a filename has been selected and if not, it will generate a popup message
         if not self.xfile:
@@ -585,16 +585,35 @@ class Gui(QtGui.QMainWindow):
                 for each_unique_id, each_unique_id_info in self.final_hl7_message.iteritems():
                     obx_fields_list = []
 
-                    # For each grouped data, it goes through each dictionary and gets all the respective data segments
-                    # To note for that each group, the MSH/PID/PV1 and OBR segments should be the same and only the OBX segments would change
-                    for each_dict_item in each_unique_id_info:
-                                
+                    first_dict_item_contents = next(iter(each_unique_id_info))
+                    msh_result = self.create_hl7_dict_values.get_msh_data(first_dict_item_contents)
+                    pid_result = self.create_hl7_dict_values.get_pid_data(first_dict_item_contents)
+                    pv1_result = self.create_hl7_dict_values.get_pv1_data(first_dict_item_contents)
+                    obr_result = self.create_hl7_dict_values.get_obr_data(first_dict_item_contents, self.current_obr_7_timestamp_state)
 
-                        msh_result = self.create_hl7_dict_values.get_msh_data(each_dict_item)
-                        pid_result = self.create_hl7_dict_values.get_pid_data(each_dict_item)
-                        pv1_result = self.create_hl7_dict_values.get_pv1_data(each_dict_item)
-                        obr_result = self.create_hl7_dict_values.get_obr_data(each_dict_item)
-                        obx_result = self.create_hl7_dict_values.get_obx_data(each_dict_item)
+
+                    #Check if any additional segment boxes have been added
+                    if self.current_hl7_segment_data != DEFAULT_HL7_SEGMENTS:
+                        print set([x.strip() for x in map(str, self.current_hl7_segment_data.split(','))]).difference([y.strip() for y in map(str, DEFAULT_HL7_SEGMENTS.split(','))])
+                        # Get the messagebox informations for those and append it
+                
+
+                    #Obtain the NodeID to be able to copy the OBX timestamp to the respective row in the QE sheet
+                    match_found = re.match(r"PV1[|](.*)[|](.*)[|](.*)", pv1_result, re.I)
+                    if match_found:
+                        current_node_id = match_found.group(3) 
+                    else:
+                        print "No Node ID found"
+
+
+                    list_of_indexes = self.create_hl7_dict_values.df.index[self.create_hl7_dict_values.df['PV1-3'] == current_node_id].tolist()
+                    index_cycle = cycle(list_of_indexes)
+
+
+                    for each_dict_item in each_unique_id_info:
+                        df_index_to_write = next(index_cycle)
+                                
+                        obx_result = self.create_hl7_dict_values.get_obx_data(each_dict_item, self.current_obx_14_timestamp_state, df_index_to_write)
                         obx_fields_list.append(obx_result)
 
                     text_file.write("")
@@ -606,7 +625,8 @@ class Gui(QtGui.QMainWindow):
                         text_file.write(each_obx_string + "\n")
                     text_file.write("\n")                                           
 
-            text_to_print = "Mapping is Done!!!\n" + "The file is stored as " + "AllVariables " + self.sheetab_string + ".hl7"             
+            text_to_print = "Mapping is Done!!!\n" + "The file is stored as " + "AllVariables " + self.sheetab_string + ".hl7"
+            self.create_hl7_dict_values.df.to_excel("AllVariables " + self.sheetab_string + ".xlsx", index=False)             
             self.load_popup(text_to_print)
             self.statusBar().showMessage('Ready')
 
@@ -629,16 +649,42 @@ class Gui(QtGui.QMainWindow):
                 # Obtains all the data that is grouped under each unique NodeID
                 for each_unique_id, each_unique_id_info in self.final_hl7_message.iteritems():
                     obx_fields_list = []
+                    
+                    
+                    # Get the first dict items MSH, PID, PV1 and OBR result as this will be common for every unique ID and the OBX contents
+                    # will be different
+                    first_dict_item_contents = next(iter(each_unique_id_info))
 
-                    # For each grouped data, it goes through each dictionary and gets all the respective data segments
-                    # To note for that each group, the MSH/PID/PV1 and OBR segments should be the same and only the OBX segments would change
+                    msh_result = self.create_hl7_dict_values.get_msh_data(first_dict_item_contents)
+                    pid_result = self.create_hl7_dict_values.get_pid_data(first_dict_item_contents)
+                    pv1_result = self.create_hl7_dict_values.get_pv1_data(first_dict_item_contents)
+                    obr_result = self.create_hl7_dict_values.get_obr_data(first_dict_item_contents, self.current_obr_7_timestamp_state)
+
+    
+
+                    #Obtain the NodeID to be able to copy the OBX timestamp to the respective row in the QE sheet
+                    match_found = re.match(r"PV1[|](.*)[|](.*)[|](.*)", pv1_result, re.I)
+                    if match_found:
+                        current_node_id = match_found.group(3) 
+                    else:
+                        print "No Node ID found"
+
+
+                    list_of_indexes = self.create_hl7_dict_values.df.index[self.create_hl7_dict_values.df['PV1-3'] == current_node_id].tolist()
+                    print list_of_indexes
+                    index_cycle = cycle(list_of_indexes)
+
+                    print pv1_result
+
+                    print len(each_unique_id_info)
+                    print len(list_of_indexes)
+
+                    
                     for each_dict_item in each_unique_id_info:              
-
-                        msh_result = self.create_hl7_dict_values.get_msh_data(each_dict_item)
-                        pid_result = self.create_hl7_dict_values.get_pid_data(each_dict_item)
-                        pv1_result = self.create_hl7_dict_values.get_pv1_data(each_dict_item)
-                        obr_result = self.create_hl7_dict_values.get_obr_data(each_dict_item)
-                        obx_result = self.create_hl7_dict_values.get_obx_data(each_dict_item)
+                        df_index_to_write = next(index_cycle)
+                        print df_index_to_write
+                                
+                        obx_result = self.create_hl7_dict_values.get_obx_data(each_dict_item, self.current_obx_14_timestamp_state, df_index_to_write)
                         obx_fields_list.append(obx_result)
 
 
@@ -654,7 +700,8 @@ class Gui(QtGui.QMainWindow):
                     text_file.write("[END DEVICE]\n")
                     text_file.write("\n")
 
-            text_to_print = "Mapping is Done!!!\n" + "The file is stored as " + "AllVariables " + self.sheetab_string + ".clbs"            
+            text_to_print = "Mapping is Done!!!\n" + "The file is stored as " + "AllVariables " + self.sheetab_string + ".clbs" 
+            self.create_hl7_dict_values.df.to_excel("AllVariables " + self.sheetab_string + ".xlsx", index=False)            
             self.load_popup(text_to_print)
             self.statusBar().showMessage('Ready')
 
