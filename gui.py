@@ -594,24 +594,38 @@ class Gui(QtGui.QMainWindow):
 
                     #Check if any additional segment boxes have been added
                     if self.current_hl7_segment_data != DEFAULT_HL7_SEGMENTS:
-                        print set([x.strip() for x in map(str, self.current_hl7_segment_data.split(','))]).difference([y.strip() for y in map(str, DEFAULT_HL7_SEGMENTS.split(','))])
-                        # Get the messagebox informations for those and append it
+                        additonal_seg_results = []
+                        diff_msg_boxes_list = set([x.strip() for x in map(str, self.current_hl7_segment_data.split(','))]).difference([y.strip() for y in map(str, DEFAULT_HL7_SEGMENTS.split(','))])
+                        # Gets the messagebox informations for those and appends it
+                        for messagebox_info in self.list_of_message_information:
+                            match_found = re.match(r"(.+)[|](.*)[|](.*)[|](.*)", messagebox_info.text(), re.I)
+                            for diff_segment in diff_msg_boxes_list:
+                                if (match_found) and (diff_segment in match_found.group(0)):
+                                    additonal_seg_results.append(match_found.group())
+                                else:
+                                    pass  # Do nothing as there is nothing to add
+
                 
-
-                    #Obtain the NodeID to be able to copy the OBX timestamp to the respective row in the QE sheet
-                    match_found = re.match(r"PV1[|](.*)[|](.*)[|](.*)", pv1_result, re.I)
-                    if match_found:
-                        current_node_id = match_found.group(3) 
+                    # Write the generated OBX timestamps back to the QE sheet
+                    if self.current_obx_14_timestamp_state == True:
+                        #Obtain the NodeID to be able to copy the OBX timestamp to the respective row in the QE sheet
+                        match_found = re.match(r"PV1[|](.*)[|](.*)[|](.*)", pv1_result, re.I)
+                        if match_found:
+                            current_node_id = match_found.group(3) 
+                            list_of_indexes = self.create_hl7_dict_values.df.index[self.create_hl7_dict_values.df['PV1-3'] == current_node_id].tolist()
+                            index_cycle = cycle(list_of_indexes)
+                        else:
+                            print "No Node ID found"
                     else:
-                        print "No Node ID found"
+                        pass # Nothing needs to be done
 
-
-                    list_of_indexes = self.create_hl7_dict_values.df.index[self.create_hl7_dict_values.df['PV1-3'] == current_node_id].tolist()
-                    index_cycle = cycle(list_of_indexes)
 
 
                     for each_dict_item in each_unique_id_info:
-                        df_index_to_write = next(index_cycle)
+                        if self.current_obx_14_timestamp_state == True:
+                            df_index_to_write = next(index_cycle)
+                        else:
+                            df_index_to_write = None
                                 
                         obx_result = self.create_hl7_dict_values.get_obx_data(each_dict_item, self.current_obx_14_timestamp_state, df_index_to_write)
                         obx_fields_list.append(obx_result)
@@ -621,6 +635,11 @@ class Gui(QtGui.QMainWindow):
                     text_file.write(pid_result + "\n")
                     text_file.write(pv1_result + "\n")
                     text_file.write(obr_result + "\n")
+
+                    if self.current_hl7_segment_data != DEFAULT_HL7_SEGMENTS:
+                        for additional_seg_result in additonal_seg_results:
+                            text_file.write(additional_seg_result + "\n")
+
                     for each_obx_string in obx_fields_list:
                         text_file.write(each_obx_string + "\n")
                     text_file.write("\n")                                           
