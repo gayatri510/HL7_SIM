@@ -344,10 +344,12 @@ class Create_Hl7_Data():
                 self.hl7_file_message = OrderedDict(sorted(self.hl7_file_message.items(), key=lambda t: t[0])) 
 
 
+
         # Remove the non_obx_variables from the list once their values are obtained for further computation
         self.remove_variables_from_list([tupleelement[0] for tupleelement in self.non_obx_variables_list])
         # Remove PV1-3 / NodeID/ 1931 variable from the self.non_obx_variables_list if any else it will incorrectly override any existing NodeIDs and mess up the messages
-        self.non_obx_variables_list = [i for i in self.non_obx_variables_list if i[0] == '1931']
+        self.non_obx_variables_list = [i for i in self.non_obx_variables_list if i[0] != '1931']
+    
 
         myIterator = cycle(range(self.num_of_unique_ids))
         
@@ -385,6 +387,7 @@ class Create_Hl7_Data():
                             self.hl7_file_message[nodeid_curr][0][header][int(field)][each_comp_index + 1] = each_comp
                         else:
                             self.hl7_file_message[nodeid_curr][0][header][int(field)][each_comp_index + 1] = subcomponents
+
 
 
         return self.hl7_file_message
