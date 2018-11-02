@@ -408,6 +408,14 @@ class Gui(QtGui.QMainWindow):
         file = "help.doc"
         os.system(file)
 
+    def user_display_message(self):
+        ''' Displays a message if '''
+        QtGui.QMessageBox.question(self, 'Select a valid file',
+                                              'Please select an xlsx file by clicking on the excel icon, ' \
+                                              'Map the columns to respective HL7 segments and '\
+                                              'click on the Map icon to generate the HL7 file', QtGui.QMessageBox.Ok)
+
+
     def updateTable(self,dropdown,dict_value):
         return lambda : dropdown.setText(dict_value)
         
@@ -635,7 +643,7 @@ class Gui(QtGui.QMainWindow):
 
         # # Makes sure that when the Map button is clicked, a filename has been selected and if not, it will generate a popup message
         if not self.xfile:
-            self.helpMessage()
+            self.user_display_message()
 
         else:
             #create popup
@@ -676,7 +684,7 @@ class Gui(QtGui.QMainWindow):
 
         # # Makes sure that when the Map button is clicked, a filename has been selected and if not, it will generate a popup message
         if not self.xfile:
-            self.helpMessage()
+            self.user_display_message()
 
         else:
             #create popup
