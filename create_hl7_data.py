@@ -1,5 +1,4 @@
 #!/usr/bin/python2.7
-
 import sys
 from collections import defaultdict, OrderedDict
 import pandas as pd
@@ -7,6 +6,8 @@ import xlrd
 import copy
 from datetime import datetime, timedelta
 from itertools import cycle
+from PyQt4 import QtGui, QtCore
+
 
 
 SEGMENT_TERMINATOR = "0x0D"   # Segment Terminator : Terminates a segment record
@@ -22,7 +23,6 @@ class Create_Hl7_Data():
 
 
         self.count = 0
-
         self.hl7_dict_values = OrderedDict()
         self.current_time = datetime.now()
 
@@ -68,7 +68,7 @@ class Create_Hl7_Data():
         '''Populates the dictionary values for each segment sent in the segment_name'''
         field_values = str(segment_box_data).strip().split(FIELD_SEPERATOR)
         key_val = field_values[0]
-        
+
         if key_val not in self.hl7_dict_values.keys():
             return
 
@@ -81,7 +81,6 @@ class Create_Hl7_Data():
             component_values = field_value.split(COMPONENT_SEPERATOR)
             if len(component_values) == 1:
                 self.hl7_dict_values[key_val][index + 1][1][1] = field_value
-
             elif len(component_values) == 0:
                 self.hl7_dict_values[key_val][index + 1][1][1] = ''
 
@@ -203,7 +202,7 @@ class Create_Hl7_Data():
             self.hl7_file_message[unique_msg_id] = []
 
 
-        for _, row_entry in self.df.iterrows():
+        for row_index, row_entry in self.df.iterrows():
             if row_entry['Capsule Variable ID'] in self.non_obx_variables_dict.keys():
                 try:
                     self.non_obx_variables_list.append((row_entry['Capsule Variable ID'], row_entry['Value HL7']))
@@ -244,7 +243,12 @@ class Create_Hl7_Data():
                 except KeyError:
                     message_id = str(row_entry['PV1-3'])
 
-                self.hl7_file_message[message_id].append(self.hl7_dict_values_each_msg)
+                try:
+                    self.hl7_file_message[message_id].append(self.hl7_dict_values_each_msg)
+                except KeyError:
+                    QtGui.QMessageBox.critical(self, "FATAL ERROR", "No NodeID was found at row_index %s in the excel sheet" % (str(row_index)))
+  
+
 
                 self.hl7_file_message = OrderedDict(sorted(self.hl7_file_message.items(), key=lambda t: t[0])) 
 

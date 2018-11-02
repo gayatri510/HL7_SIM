@@ -701,14 +701,14 @@ class Gui(QtGui.QMainWindow):
 
                         if self.additional_seg_results is not None:
                         	for additional_seg_result in self.additional_seg_results:
-                        		text_file.write(additional_seg_result + "\n")
+                        		text_file.write(additional_seg_result + "|<CR>" + "\n")
 
 
                         for each_obx_string in obx_fields_list:
                             text_file.write(each_obx_string + "|<CR>" + "\n")
-                            text_file.write("<FS><CR>\n")
-                            text_file.write("[END DEVICE]\n")
-                            text_file.write("\n")
+                        text_file.write("<FS><CR>\n")
+                        text_file.write("[END DEVICE]\n")
+                        text_file.write("\n")
 
             text_to_print = "Mapping is Done!!!\n" + "The file is stored in the following location\n" + os.getcwd() + "\AllVariables " + self.sheetab_string + ".clbs" 
             self.create_hl7_dict_values.df.to_excel("AllVariables " + self.sheetab_string + ".xlsx", index=False)            
