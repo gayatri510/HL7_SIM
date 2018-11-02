@@ -392,10 +392,10 @@ class Gui(QtGui.QMainWindow):
             event.ignore()                                            
 
     def helpMessage(self):
-        help_msg = QtGui.QMessageBox.question(self, 'Select a valid file',
-                                              'Please select an xlsx file by clicking on the excel icon, ' \
-                                              'Map the columns to respective HL7 segments and '\
-                                              'click on the Map icon to generate the HL7 file', QtGui.QMessageBox.Ok)
+        ''' Opens the user manual for Purple Panda'''
+        # should be more robust and needs to be changed 
+        file = "help.doc"
+        os.system(file)
 
     def updateTable(self,dropdown,dict_value):
         return lambda : dropdown.setText(dict_value)
@@ -585,66 +585,63 @@ class Gui(QtGui.QMainWindow):
                 for each_unique_id, each_unique_id_info in self.final_hl7_message.iteritems():
                     obx_fields_list = []
 
-                    first_dict_item_contents = next(iter(each_unique_id_info))
-                    msh_result = self.create_hl7_dict_values.get_msh_data(first_dict_item_contents)
-                    pid_result = self.create_hl7_dict_values.get_pid_data(first_dict_item_contents)
-                    pv1_result = self.create_hl7_dict_values.get_pv1_data(first_dict_item_contents)
-                    obr_result = self.create_hl7_dict_values.get_obr_data(first_dict_item_contents, self.current_obr_7_timestamp_state)
-
-
-                    #Check if any additional segment boxes have been added
-                    if self.current_hl7_segment_data != DEFAULT_HL7_SEGMENTS:
-                        additonal_seg_results = []
-                        diff_msg_boxes_list = set([x.strip() for x in map(str, self.current_hl7_segment_data.split(','))]).difference([y.strip() for y in map(str, DEFAULT_HL7_SEGMENTS.split(','))])
-                        # Gets the messagebox informations for those and appends it
-                        for messagebox_info in self.list_of_message_information:
-                            match_found = re.match(r"(.+)[|](.*)[|](.*)[|](.*)", messagebox_info.text(), re.I)
-                            for diff_segment in diff_msg_boxes_list:
-                                if (match_found) and (diff_segment in match_found.group(0)):
-                                    additonal_seg_results.append(match_found.group())
-                                else:
-                                    pass  # Do nothing as there is nothing to add
-
-                
-                    # Write the generated OBX timestamps back to the QE sheet
-                    if self.current_obx_14_timestamp_state == True:
-                        #Obtain the NodeID to be able to copy the OBX timestamp to the respective row in the QE sheet
-                        match_found = re.match(r"PV1[|](.*)[|](.*)[|](.*)", pv1_result, re.I)
-                        if match_found:
-                            current_node_id = match_found.group(3) 
-                            list_of_indexes = self.create_hl7_dict_values.df.index[self.create_hl7_dict_values.df['PV1-3'] == current_node_id].tolist()
-                            index_cycle = cycle(list_of_indexes)
-                        else:
-                            print "No Node ID found"
-                    else:
-                        pass # Nothing needs to be done
-
-
-
-                    for each_dict_item in each_unique_id_info:
+                    # To check if the each_unique_id_info dict exists
+                    if any(each_unique_id_info):
+                        first_dict_item_contents = next(iter(each_unique_id_info))
+                        msh_result = self.create_hl7_dict_values.get_msh_data(first_dict_item_contents)
+                        pid_result = self.create_hl7_dict_values.get_pid_data(first_dict_item_contents)
+                        pv1_result = self.create_hl7_dict_values.get_pv1_data(first_dict_item_contents)
+                        obr_result = self.create_hl7_dict_values.get_obr_data(first_dict_item_contents, self.current_obr_7_timestamp_state)
+                        # Check if any additional segment boxes have been added
+                        if self.current_hl7_segment_data != DEFAULT_HL7_SEGMENTS:
+                            additonal_seg_results = []
+                            diff_msg_boxes_list = set([x.strip() for x in map(str, self.current_hl7_segment_data.split(','))]).difference([y.strip() for y in map(str, DEFAULT_HL7_SEGMENTS.split(','))])
+                            # Gets the messagebox informations for those and appends it
+                            for messagebox_info in self.list_of_message_information:
+                                match_found = re.match(r"(.+)[|](.*)[|](.*)[|](.*)", messagebox_info.text(), re.I)
+                                for diff_segment in diff_msg_boxes_list:
+                                    if (match_found) and (diff_segment in match_found.group(0)):
+                                        additonal_seg_results.append(match_found.group())
+                                    else:
+                                        pass  # Do nothing as there is nothing to add             
+                        # Write the generated OBX timestamps back to the QE sheet
                         if self.current_obx_14_timestamp_state == True:
-                            df_index_to_write = next(index_cycle)
+                            # Obtain the NodeID to be able to copy the OBX timestamp to the respective row in the QE sheet
+                            match_found = re.match(r"PV1[|](.*)[|](.*)[|](.*)", pv1_result, re.I)
+                            if match_found:
+                                current_node_id = match_found.group(3) 
+                                list_of_indexes = self.create_hl7_dict_values.df.index[self.create_hl7_dict_values.df['PV1-3'] == current_node_id].tolist()
+                                index_cycle = cycle(list_of_indexes)
+                            else:
+                                print "No Node ID found"
                         else:
-                            df_index_to_write = None
-                                
-                        obx_result = self.create_hl7_dict_values.get_obx_data(each_dict_item, self.current_obx_14_timestamp_state, df_index_to_write)
-                        obx_fields_list.append(obx_result)
+                            pass # Nothing needs to be done
 
-                    text_file.write("")
-                    text_file.write(msh_result + "\n")
-                    text_file.write(pid_result + "\n")
-                    text_file.write(pv1_result + "\n")
-                    text_file.write(obr_result + "\n")
+                        for each_dict_item in each_unique_id_info:
+                            if self.current_obx_14_timestamp_state == True:
+                                df_index_to_write = next(index_cycle)
+                            else:
+                                df_index_to_write = None
 
-                    if self.current_hl7_segment_data != DEFAULT_HL7_SEGMENTS:
-                        for additional_seg_result in additonal_seg_results:
-                            text_file.write(additional_seg_result + "\n")
+                            obx_result = self.create_hl7_dict_values.get_obx_data(each_dict_item, self.current_obx_14_timestamp_state, df_index_to_write)
+                            obx_fields_list.append(obx_result)
 
-                    for each_obx_string in obx_fields_list:
-                        text_file.write(each_obx_string + "\n")
-                    text_file.write("\n")                                           
+                        text_file.write("")
+                        text_file.write(msh_result + "\n")
+                        text_file.write(pid_result + "\n")
+                        text_file.write(pv1_result + "\n")
+                        text_file.write(obr_result + "\n")
 
-            text_to_print = "Mapping is Done!!!\n" + "The file is stored as " + "AllVariables " + self.sheetab_string + ".hl7"
+                        if self.current_hl7_segment_data != DEFAULT_HL7_SEGMENTS:
+                            for additional_seg_result in additonal_seg_results:
+                                text_file.write(additional_seg_result + "\n")
+
+                        for each_obx_string in obx_fields_list:
+                            text_file.write(each_obx_string + "\n")
+                        text_file.write("\n") 
+
+
+            text_to_print = "Mapping is Done!!!\n" + "The file is stored in the following location:\n" + os.getcwd() + "\AllVariables " + self.sheetab_string + ".hl7"
             self.create_hl7_dict_values.df.to_excel("AllVariables " + self.sheetab_string + ".xlsx", index=False)             
             self.load_popup(text_to_print)
             self.statusBar().showMessage('Ready')
@@ -668,58 +665,66 @@ class Gui(QtGui.QMainWindow):
                 # Obtains all the data that is grouped under each unique NodeID
                 for each_unique_id, each_unique_id_info in self.final_hl7_message.iteritems():
                     obx_fields_list = []
-                    
-                    
-                    # Get the first dict items MSH, PID, PV1 and OBR result as this will be common for every unique ID and the OBX contents
-                    # will be different
-                    first_dict_item_contents = next(iter(each_unique_id_info))
 
-                    msh_result = self.create_hl7_dict_values.get_msh_data(first_dict_item_contents)
-                    pid_result = self.create_hl7_dict_values.get_pid_data(first_dict_item_contents)
-                    pv1_result = self.create_hl7_dict_values.get_pv1_data(first_dict_item_contents)
-                    obr_result = self.create_hl7_dict_values.get_obr_data(first_dict_item_contents, self.current_obr_7_timestamp_state)
+                    # To check if the each_unique_id_info dict exists
+                    if any(each_unique_id_info):
+                        first_dict_item_contents = next(iter(each_unique_id_info))
+                        msh_result = self.create_hl7_dict_values.get_msh_data(first_dict_item_contents)
+                        pid_result = self.create_hl7_dict_values.get_pid_data(first_dict_item_contents)
+                        pv1_result = self.create_hl7_dict_values.get_pv1_data(first_dict_item_contents)
+                        obr_result = self.create_hl7_dict_values.get_obr_data(first_dict_item_contents, self.current_obr_7_timestamp_state)
+                        # Check if any additional segment boxes have been added
+                        if self.current_hl7_segment_data != DEFAULT_HL7_SEGMENTS:
+                            additonal_seg_results = []
+                            diff_msg_boxes_list = set([x.strip() for x in map(str, self.current_hl7_segment_data.split(','))]).difference([y.strip() for y in map(str, DEFAULT_HL7_SEGMENTS.split(','))])
+                            # Gets the messagebox informations for those and appends it
+                            for messagebox_info in self.list_of_message_information:
+                                match_found = re.match(r"(.+)[|](.*)[|](.*)[|](.*)", messagebox_info.text(), re.I)
+                                for diff_segment in diff_msg_boxes_list:
+                                    if (match_found) and (diff_segment in match_found.group(0)):
+                                        additonal_seg_results.append(match_found.group())
+                                    else:
+                                        pass  # Do nothing as there is nothing to add             
+                        # Write the generated OBX timestamps back to the QE sheet
+                        if self.current_obx_14_timestamp_state == True:
+                            # Obtain the NodeID to be able to copy the OBX timestamp to the respective row in the QE sheet
+                            match_found = re.match(r"PV1[|](.*)[|](.*)[|](.*)", pv1_result, re.I)
+                            if match_found:
+                                current_node_id = match_found.group(3) 
+                                list_of_indexes = self.create_hl7_dict_values.df.index[self.create_hl7_dict_values.df['PV1-3'] == current_node_id].tolist()
+                                index_cycle = cycle(list_of_indexes)
+                            else:
+                                print "No Node ID found"
+                        else:
+                            pass # Nothing needs to be done
 
-    
+                        for each_dict_item in each_unique_id_info:
+                            if self.current_obx_14_timestamp_state == True:
+                                df_index_to_write = next(index_cycle)
+                            else:
+                                df_index_to_write = None
 
-                    #Obtain the NodeID to be able to copy the OBX timestamp to the respective row in the QE sheet
-                    match_found = re.match(r"PV1[|](.*)[|](.*)[|](.*)", pv1_result, re.I)
-                    if match_found:
-                        current_node_id = match_found.group(3) 
-                    else:
-                        print "No Node ID found"
+                            obx_result = self.create_hl7_dict_values.get_obx_data(each_dict_item, self.current_obx_14_timestamp_state, df_index_to_write)
+                            obx_fields_list.append(obx_result)
 
+                        text_file.write("[BEGIN DEVICE]\n")
+                        text_file.write("<VT>" + msh_result + "|<CR>" + "\n")
+                        text_file.write(pid_result + "|<CR>" + "\n")
+                        text_file.write(pv1_result + "|<CR>" + "\n")
+                        text_file.write(obr_result + "|<CR>" + "\n")
 
-                    list_of_indexes = self.create_hl7_dict_values.df.index[self.create_hl7_dict_values.df['PV1-3'] == current_node_id].tolist()
-                    print list_of_indexes
-                    index_cycle = cycle(list_of_indexes)
-
-                    print pv1_result
-
-                    print len(each_unique_id_info)
-                    print len(list_of_indexes)
-
-                    
-                    for each_dict_item in each_unique_id_info:              
-                        df_index_to_write = next(index_cycle)
-                        print df_index_to_write
-                                
-                        obx_result = self.create_hl7_dict_values.get_obx_data(each_dict_item, self.current_obx_14_timestamp_state, df_index_to_write)
-                        obx_fields_list.append(obx_result)
+                        if self.current_hl7_segment_data != DEFAULT_HL7_SEGMENTS:
+                            for additional_seg_result in additonal_seg_results:
+                                text_file.write(additional_seg_result + "\n")
 
 
+                        for each_obx_string in obx_fields_list:
+                            text_file.write(each_obx_string + "|<CR>" + "\n")
+                            text_file.write("<FS><CR>\n")
+                            text_file.write("[END DEVICE]\n")
+                            text_file.write("\n")
 
-                    text_file.write("[BEGIN DEVICE]\n")
-                    text_file.write("<VT>" + msh_result + "|<CR>" + "\n")
-                    text_file.write(pid_result + "|<CR>" + "\n")
-                    text_file.write(pv1_result + "|<CR>" + "\n")
-                    text_file.write(obr_result + "|<CR>" + "\n")
-                    for each_obx_string in obx_fields_list:
-                        text_file.write(each_obx_string + "|<CR>" + "\n")
-                    text_file.write("<FS><CR>\n")
-                    text_file.write("[END DEVICE]\n")
-                    text_file.write("\n")
-
-            text_to_print = "Mapping is Done!!!\n" + "The file is stored as " + "AllVariables " + self.sheetab_string + ".clbs" 
+            text_to_print = "Mapping is Done!!!\n" + "The file is stored in the following location\n" + os.getcwd() + "\AllVariables " + self.sheetab_string + ".clbs" 
             self.create_hl7_dict_values.df.to_excel("AllVariables " + self.sheetab_string + ".xlsx", index=False)            
             self.load_popup(text_to_print)
             self.statusBar().showMessage('Ready')
