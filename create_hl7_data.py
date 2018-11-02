@@ -9,24 +9,21 @@ from datetime import datetime, timedelta
 from itertools import cycle
 
 
+SEGMENT_TERMINATOR = "0x0D"   # Segment Terminator : Terminates a segment record
+FIELD_SEPERATOR= "|"          # Field Separator : Separates two adjacent data fields within a segment
+COMPONENT_SEPERATOR = "^"     # Component Separator : Separates adjacent components of data fields
+SUBCOMPONENT_SEPERATOR = "&"  # Subcomponent Separator : Separates adjacent subcomponents of data fields
+REPITITION_SEPERATOR = "~"    # Repitition Separator : Seperates multiple occurrences of a field
+
 
 class Create_Hl7_Data():
 
     def __init__(self):
 
-        # Segment Terminator : Terminates a segment record
-        self.segment_terminator = "0x0D"
-        # Field Separator : Separates two adjacent data fields within a segment
-        self.field_separator = "|"
-        # Component Separator : Separates adjacent components of data fields
-        self.component_separator = "^"
-        # Subcomponent Separator : Separates adjacent subcomponents of data fields
-        self.subcomponent_separator = "&"
-        # Repitition Separator : Seperates multiple occurrences of a field
-        self.repitition_separator = "~"
+
+        self.count = 0
 
         self.hl7_dict_values = OrderedDict()
-        self.count = 0
         self.current_time = datetime.now()
 
 
@@ -53,8 +50,6 @@ class Create_Hl7_Data():
                 segments_counts_list.append(value)
                 segments_and_counts_dict[segment_name] = segments_counts_list
 
-
-
         # Create empty dictionaries for each segment. The following will generate something similar to {MSH:{1:{1:{1 : ''}}}} and the blanks will hold the value for
         # MSH-1-1-1 
 
@@ -63,140 +58,51 @@ class Create_Hl7_Data():
             for field_count in range(1, int(segments_and_counts_dict[every_key][0]) + 1):
                 self.hl7_dict_values[every_key][field_count] = OrderedDict()
                 for component_count in range(1, int(segments_and_counts_dict[every_key][1]) + 1):
-                    self.hl7_dict_values[every_key][field_count][component_count] = defaultdict(list)
+                    self.hl7_dict_values[every_key][field_count][component_count] = OrderedDict()
+                    for subcomponent_count in range(1, int(segments_and_counts_dict[every_key][2]) + 1):
+                        self.hl7_dict_values[every_key][field_count][component_count][subcomponent_count] = ''
  
+
+    
+    def populate_each_seg_dict(self, segment_box_data=None):
+        '''Populates the dictionary values for each segment sent in the segment_name'''
+        field_values = str(segment_box_data).strip().split(FIELD_SEPERATOR)
+        key_val = field_values[0]
+        
+        if key_val not in self.hl7_dict_values.keys():
+            return
+
+        if field_values[0] == "MSH":
+            pass
+        else:
+            field_values = field_values[1:]
+
+        for index, field_value in enumerate(field_values):
+            component_values = field_value.split(COMPONENT_SEPERATOR)
+            if len(component_values) == 1:
+                self.hl7_dict_values[key_val][index + 1][1][1] = field_value
+
+            elif len(component_values) == 0:
+                self.hl7_dict_values[key_val][index + 1][1][1] = ''
+
+            # If the field has multiple componetns like "000000 & 111111^^^^AN"
+            elif len(component_values) > 1:
+                for comp_index, component_value in enumerate(component_values):
+                    # Need to check if the components have multiple subcomponents like "000000 & 111111"
+                    subcomponent_values = component_value.split(SUBCOMPONENT_SEPERATOR)
+                    # If this list is empty, it means this component doesn't have multiple subcomponents
+                    if len(subcomponent_values) == 1:
+                        self.hl7_dict_values[key_val][index + 1][comp_index + 1][1] = component_value
+                    else:
+                        for s_index, subcompvalues in enumerate(subcomponent_values):
+                            self.hl7_dict_values[key_val][index + 1][comp_index + 1][s_index + 1] = subcompvalues
+
 
     def split_message_box_segments(self, list_of_message_information):
         # Obtain the texts and map them to the respective HL7 Segments
             for each_info in list_of_message_information:
-                messagebox_text = each_info.text()
-
-                # This will split the information on '|' and generate a list of the different field values
-                field_values = str(messagebox_text).strip().split(self.field_separator)
-
-
-                #Based on the field values, place the different fields in to the appropriate fields of the dictionary
-
-                #This checks if the field belongs to the MSH Segment
-                
-                if field_values[0] == "MSH":
-                    #field_values = field_values[1:]
-                    for index, field_value in enumerate(field_values):
-
-                        # Need to check if the fields have multiple components
-                        component_values = field_value.split(self.component_separator)
-
-                        # If this list is empty, it means this field doesn't have multiple components
-                        if len(component_values) < 1:
-                            self.hl7_dict_values['MSH'][index + 1][1] = field_value
-                        
-                        # If the field has multiple componetns like "000000 & 111111^^^^AN"
-                        else:
-                            for comp_index, component_value in enumerate(component_values):
-                                
-                                # Need to check if the components have multiple subcomponents like "000000 & 111111"
-                                subcomponent_values = component_value.split(self.subcomponent_separator)
-
-                                # If this list is empty, it means this component doesn't have multiple subcomponents
-                                if len(subcomponent_values) < 1:
-                                    self.hl7_dict_values['MSH'][index + 1][comp_index + 1] = component_value
-                                else:
-                                    self.hl7_dict_values['MSH'][index + 1][comp_index + 1] = subcomponent_values
-
-
-
-
-                # This checks if the field belongs to the PID Segment
-                # Ex: PID|||000000^^^^AN||UNKNOWN|||||||||||||000000
-                           
-                if field_values[0] == "PID":
-         
-                    field_values = field_values[1:]
-                    for index, field_value in enumerate(field_values):
-
-                        # Need to check if the fields have multiple components
-                        component_values = field_value.split(self.component_separator)
-
-                        # If this list is empty, it means this field doesn't have multiple components
-                        if len(component_values) < 1:
-                            self.hl7_dict_values['PID'][index + 1][1] = field_value
-                        
-                        # If the field has multiple componetns like "000000 & 111111^^^^AN"
-                        else:
-                            for comp_index, component_value in enumerate(component_values):
-                                
-                                # Need to check if the components have multiple subcomponents like "000000 & 111111"
-                                subcomponent_values = component_value.split(self.subcomponent_separator)
-
-                                # If this list is empty, it means this component doesn't have multiple subcomponents
-                                if len(subcomponent_values) < 1:
-                                    self.hl7_dict_values['PID'][index + 1][comp_index + 1] = component_value
-                                else:
-                                    self.hl7_dict_values['PID'][index + 1][comp_index + 1] = subcomponent_values
-
-
-
-                # This checks if the field belongs to the PV1 Segment
-                # Ex: PV1|||SURG^^OR4
-                
-                if field_values[0] == "PV1":
-
-                    field_values = field_values[1:]
-                    for index, field_value in enumerate(field_values):
-
-                        # Need to check if the fields have multiple components
-                        component_values = field_value.split(self.component_separator)
- 
-
-                        # If this list is empty, it means this field doesn't have multiple components
-                        if len(component_values) < 1:
-                            self.hl7_dict_values['PV1'][index + 1][1] = field_value
-                        
-                        # If the field has multiple componetns like "000000 & 111111^^^^AN"
-                        else:
-                            for comp_index, component_value in enumerate(component_values):
-                                
-                                # Need to check if the components have multiple subcomponents like "000000 & 111111"
-                                subcomponent_values = component_value.split(self.subcomponent_separator)
-
-                                # If this list is empty, it means this component doesn't have multiple subcomponents
-                                if len(subcomponent_values) < 1:
-                                    self.hl7_dict_values['PV1'][index + 1][comp_index + 1] = component_value
-                                else:
-                                    self.hl7_dict_values['PV1'][index + 1][comp_index + 1] = subcomponent_values
-
- 
-
-
-                # This checks if the field belongs to the PV1 Segment
-                # Ex: OBR|||||||20150217131700
-                
-                if field_values[0] == "OBR":
-
-                    field_values = field_values[1:]
-                    for index, field_value in enumerate(field_values):
-
-                        # Need to check if the fields have multiple components
-                        component_values = field_value.split(self.component_separator)
- 
-
-                        # If this list is empty, it means this field doesn't have multiple components
-                        if len(component_values) < 1:
-                            self.hl7_dict_values['OBR'][index + 1][1] = field_value
-                        
-                        # If the field has multiple componetns like "000000 & 111111^^^^AN"
-                        else:
-                            for comp_index, component_value in enumerate(component_values):
-                                
-                                # Need to check if the components have multiple subcomponents like "000000 & 111111"
-                                subcomponent_values = component_value.split(self.subcomponent_separator)
-
-                                # If this list is empty, it means this component doesn't have multiple subcomponents
-                                if len(subcomponent_values) < 1:
-                                    self.hl7_dict_values['OBR'][index + 1][comp_index + 1] = component_value
-                                else:
-                                    self.hl7_dict_values['OBR'][index + 1][comp_index + 1] = subcomponent_values
-
+                # This will split the information on '|' and generate a list of the different field values          
+                self.populate_each_seg_dict(segment_box_data = each_info.text())
 
 
     def remove_variables_from_list(self, var_list):
@@ -220,9 +126,6 @@ class Create_Hl7_Data():
         #Remove the calculated and non_obx Capsule Variable IDs that will not be part of the OBX messages
         self.remove_variables_from_list(calculated_var_list)
         self.non_obx_variables_dict = non_obx_variables_dict
-        # self.remove_variables_from_list(map(int, self.non_obx_variables_dict.keys()))
-
-
         # Traverse through each row of the table, get the column 0 and 1 strings and if an HL7 segment mapping exists, then
         # rename the excel sheet with the name present in column 0 with that present in column 1
         self.mapping_list = []
@@ -234,8 +137,49 @@ class Create_Hl7_Data():
                 self.mapping_list.append(column1_text)
                 self.df.rename(columns={column0_text : column1_text},inplace=True)
 
-        self.df.to_excel("Renamed.xlsx", index=False)    
 
+        #self.df.to_excel("Renamed.xlsx", index=False)    
+
+
+    def set_data(self, data=None, data_dict=None, item_to_split=None):
+        '''Sets the data in the data_dict with the args specifiying the key, field, comp and subcomp locations'''
+
+        # Check for the length of the list. If it is 4, it implies it is in the format of ex: OBX-3-1-1
+        if len(item_to_split.split('-')) == 4:
+            header, field, comp, subcomp = item_to_split.split('-')
+            data_dict[header][int(field)][int(comp)][int(subcomp)] = data
+
+        # Check for the length of the list. If it is 3, it implies it is in the format of ex: OBX-3-1
+        if len(item_to_split.split('-')) == 3:
+            header, field, comp = item_to_split.split('-')
+            subcomponents_list = data.split(SUBCOMPONENT_SEPERATOR)
+            # Case where OBX-3-1 is in format of 1&2
+            if len(subcomponents_list) > 1:
+                for s_index, subcomponent_value in enumerate(subcomponents_list):
+                    data_dict[header][int(field)][int(comp)][s_index + 1] = subcomponent_value
+            # Case where OBX-3-1 is in format of 1
+            elif len(subcomponents_list) == 1:
+                data_dict[header][int(field)][int(comp)][1] = data
+                
+
+        # Check for the length of the list. If it is 2, it implies it is in the format of ex: OBX-3
+        if len(item_to_split.split('-')) == 2:
+            header, field = item_to_split.split('-')
+            # It can be in the format of 1^2 or 1&2^3&4 or just 1, all three cases have to be covered     
+            components_list = data.split(COMPONENT_SEPERATOR)
+            # Case 1: OBX-3 is in format of 1^2 or 1&2^3 or 1&2^3&4
+            if (len(components_list) > 1):
+                for each_comp_index, each_comp in enumerate(components_list):
+                    subcomponents_list = each_comp.split(SUBCOMPONENT_SEPERATOR)
+                    if len(subcomponents_list) == 1:
+                        data_dict[header][int(field)][each_comp_index + 1][1] = each_comp
+                    elif len(subcomponents_list) > 1:
+                        for s_index, subcomponent_value in enumerate(subcomponents_list):
+                            data_dict[header][int(field)][each_comp_index + 1][s_index + 1] = subcomponent_value   
+            # Case 2: OBX-3 is in format of 1
+            elif len(components_list) == 1:
+                data_dict[header][int(field)][1][1] = data
+                            
 
     def generate_hl7_message_data(self):
         ''' This method will create a dictionary which will have all the data necessary to generate the simulation file'''
@@ -247,9 +191,10 @@ class Create_Hl7_Data():
 
         # The following will try to get all the unique NodeIDs in the excel sheet
         try:
-            unique_message_ids = map(str, self.df['NodeID'].unique())
+            unique_message_ids = [x for x in map(str, self.df['NodeID'].unique()) if x != 'nan']
         except KeyError:
-            unique_message_ids = map(str, self.df['PV1-3'].unique())
+            unique_message_ids = [x for x in map(str, self.df['PV1-3'].unique()) if x != 'nan']
+
         self.num_of_unique_ids = len(unique_message_ids)
 
         # Create a big message_dictionary whose key will be the unique Node ID 
@@ -290,47 +235,7 @@ class Create_Hl7_Data():
                     except ValueError:
                         pass
 
-
-                    mapping_list_components =  item.split('-')
-
-
-                    # Check for the length of the list. If it is 4, it implies it is in the format of ex: OBX-3-1-1
-                    if len(mapping_list_components) == 4:
-                        self.hl7_dict_values_each_msg[mapping_list_components[0]][int(mapping_list_components[1])][int(mapping_list_components[2])].append(row_value)
-
-                    # Check for the length of the list. If it is 3, it implies it is in the format of ex: OBX-3-1
-                    if len(mapping_list_components) == 3:
-                        subcomponents_list = row_value.split('&')
-                        # Case where OBX-3-1 is in format of 1&2
-                        if len(subcomponents_list) > 0:
-                            self.hl7_dict_values_each_msg[mapping_list_components[0]][int(mapping_list_components[1])][int(mapping_list_components[2])] = subcomponents_list
-
-                        # Case where OBX-3-1 is in format of 1
-                        else:
-                            self.hl7_dict_values_each_msg[mapping_list_components[0]][int(mapping_list_components[1])][int(mapping_list_components[2])] = row_value
-                          
-                
-                    # Check for the length of the list. If it is 2, it implies it is in the format of ex: OBX-3
-                    # It can be in the format of 1^2 or 1&2^3&4 or just 1, all three cases have to be covered
-                    if len(mapping_list_components) == 2:
-                        components_list = row_value.split('^')
-
-
-                        # Case 1: OBX-3 is in format of 1
-                        if len(components_list) == 0:
-                            self.hl7_dict_values_each_msg[mapping_list_components[0]][int(mapping_list_components[1])][1] = row_value
-
-                        # Case 2: OBX-3 is in format of 1^2 or 1&2^3 or 1&2^3&4
-                        if (len(components_list) > 0):
-                            for each_comp_index, each_comp in enumerate(components_list):
-                                subcomponents = each_comp.split('&')
-
-                                if len(subcomponents) == 0:
-                                    self.hl7_dict_values_each_msg[mapping_list_components[0]][int(mapping_list_components[1])][each_comp_index + 1] = each_comp
-                                else:
-                                    self.hl7_dict_values_each_msg[mapping_list_components[0]][int(mapping_list_components[1])][each_comp_index + 1] = subcomponents
-
-                
+                    self.set_data(data=row_value, data_dict=self.hl7_dict_values_each_msg, item_to_split=item)
 
                 # Traverse through each row of the sheet, obtain the Unique ID (in this case Node ID is used) and append that
                 # hl7_dict_values dictionary to the appropriate list associated with that Unique ID
@@ -349,185 +254,63 @@ class Create_Hl7_Data():
         self.remove_variables_from_list([tupleelement[0] for tupleelement in self.non_obx_variables_list])
         # Remove PV1-3 / NodeID/ 1931 variable from the self.non_obx_variables_list if any else it will incorrectly override any existing NodeIDs and mess up the messages
         self.non_obx_variables_list = [i for i in self.non_obx_variables_list if i[0] != '1931']
-    
-
         myIterator = cycle(range(self.num_of_unique_ids))
         
         # Insert the non-obx variables in the self.hl7_file_message before returning it 
         for caps_id, var_value in self.non_obx_variables_list:
             nodeid_curr = list(self.hl7_file_message.keys())[myIterator.next()]
-
-            # Check for the length of the list. If it is 3, it implies it is in the format of ex: PID-3-1
-            if len(self.non_obx_variables_dict[caps_id].split('-')) == 3:
-                header, field, comp = self.non_obx_variables_dict[caps_id].split('-') 
-                subcomponents_list = var_value.split('&')
-                # Case where PID-3-1 is in format of 1&2
-                if len(subcomponents_list) > 0:
-                    self.hl7_file_message[nodeid_curr][0][header][int(field)][int(comp)] = subcomponents_list
-                # Case where OBX-3-1 is in format of 1
-                else:
-                    self.hl7_file_message[nodeid_curr][0][header][int(field)][int(comp)] = var_value
-
-        
-            # Check for the length of the list. If it is 2, it implies it is in the format of ex: PV1-3
-            # It can be in the format of 1^2 or 1&2^3&4 or just 1, all three cases have to be covered
-            if len(self.non_obx_variables_dict[caps_id].split('-')) == 2:
-                header, field = self.non_obx_variables_dict[caps_id].split('-') 
-                components_list = var_value.split('^')
-
-                # Case 1: PV1-3 is in format of 'ICU'
-                if len(components_list) == 0:
-                    self.hl7_file_message[nodeid_curr][0][header][int(field)][1] = var_value
-
-                # Case 2: PV1-3 is in format of 1^2 or 1&2^3 or 1&2^3&4
-                if (len(components_list) > 0):
-                    for each_comp_index, each_comp in enumerate(components_list):
-                        subcomponents = each_comp.split('&')
-                        if len(subcomponents) == 0:
-                            self.hl7_file_message[nodeid_curr][0][header][int(field)][each_comp_index + 1] = each_comp
-                        else:
-                            self.hl7_file_message[nodeid_curr][0][header][int(field)][each_comp_index + 1] = subcomponents
-
-
+            self.set_data(data=var_value, data_dict=self.hl7_file_message[nodeid_curr][0], item_to_split=self.non_obx_variables_dict[caps_id])
 
         return self.hl7_file_message
 
         
-    def remove_trailing_field_seperators(self, string_to_trim):
-        ''' Will trim'''
+    def remove_trailing_delimiters(self, string_to_trim, string_delimiter):
+        ''' Will trim any string based off of the given delimiters'''
         # This part of the code will remove any trailing '|'s
-        string_temp =  string_to_trim.split('|')
+        string_temp =  string_to_trim.split(string_delimiter)
         while string_temp:
             if string_temp[-1] == '':
                 string_temp.pop()
             else:
                 break
 
-        return self.field_separator.join(string_temp)
+        return string_delimiter.join(string_temp)
 
-    def get_msh_data(self, dictionary_item):
-        ''' Gets the MSH segment '''
-        msh_comp_list = []
+    def get_key_val_data(self, dictionary_item, key_val=None, timestamp_state=False, timestamp_index=None, index_to_write=None):
+        ''' Gets the key_val segment data'''
+        component_part = []        
+        for f_key, f_value in dictionary_item[key_val].iteritems():
+            subcomponent_part = []
+            for comp_key, comp_value in f_value.iteritems(): 
+                subcomp_list = []
+                for subcomp_key, subcomp_value in comp_value.iteritems():
+                    subcomp_list.append(subcomp_value)
+                subcomponent_part.append(self.remove_trailing_delimiters(SUBCOMPONENT_SEPERATOR.join(subcomp_list), SUBCOMPONENT_SEPERATOR))  # 1&&&&
+            component_part.append(self.remove_trailing_delimiters(COMPONENT_SEPERATOR.join(subcomponent_part), COMPONENT_SEPERATOR))  # 1&&&&^2&&&&&
         
-        # Key value will be in the format of  ex: 1    OrderedDict([(1, ['1']), (2, defaultdict(<type 'list'>, {}))])
-        for key, value in dictionary_item['MSH'].iteritems():
-            msh_subcomp_list = []
-            #field_keys and field_values will be in the format of 
-            # 1 <type 'list'>  and 2 <type 'collections.defaultdict'>
-            for field_keys, field_values in value.iteritems():
-                if isinstance(field_values, (list,)):
-                    if len(field_values) == 1:
-                        msh_subcomp_list.extend(field_values)
-                    elif len(field_values) > 1:
-                        msh_subcomp_list.append(self.subcomponent_separator.join(field_values))
-            msh_comp_list.append(self.component_separator.join(msh_subcomp_list))
 
-        msh_result = self.remove_trailing_field_seperators(self.field_separator.join(msh_comp_list))
-
-        return msh_result
+        if key_val == 'OBX' and 'OBX-1' not in self.mapping_list:
+            self.count = self.count + 1
+            component_part[0] = str(self.count)
+        else:
+            pass
 
         
-    def get_pid_data(self, dictionary_item):
-        ''' Gets the PID segment '''
-        pid_comp_list = []        
-        # Key value will be in the format of  ex: 1    OrderedDict([(1, ['1']), (2, defaultdict(<type 'list'>, {}))])
-        for key, value in dictionary_item['PID'].iteritems():
-            pid_subcomp_list = []
-            #field_keys and field_values will be in the format of 
-            # 1 <type 'list'>  and 2 <type 'collections.defaultdict'>
-            for field_keys, field_values in value.iteritems():
-                if isinstance(field_values, (list,)):
-                    if len(field_values) == 1:       
-                        pid_subcomp_list.extend(field_values)
-                    elif len(field_values) > 1:
-                        pid_subcomp_list.append(self.subcomponent_separator.join(field_values))
-            pid_comp_list.append(self.component_separator.join(pid_subcomp_list))
-
-        pid_result = self.remove_trailing_field_seperators("PID|" + self.field_separator.join(pid_comp_list))
-
-        return pid_result
+        # Setting timestamp from the current timestamp + 1s delay for every segment that has timestamp = True
+        if timestamp_state is True and timestamp_index is not None:
+            self.current_time = self.current_time + timedelta(seconds = 1)         
+            component_part[timestamp_index - 1] = "%d%d%d%d%d%d" % (self.current_time.year, self.current_time.month, self.current_time.day, self.current_time.hour, self.current_time.minute, self.current_time.second)
+            
+            if index_to_write is not None:
+                try:
+                    self.df.loc[index_to_write, "MeasurementTime"] = self.current_time.strftime("%m/%d/%Y - %H:%M:%S")
+                except AttributeError:
+                    pass # Add error handling
+       
+        if key_val == 'MSH':
+            result = self.remove_trailing_delimiters(FIELD_SEPERATOR.join(component_part), FIELD_SEPERATOR)
+        else:
+            result = self.remove_trailing_delimiters((key_val + FIELD_SEPERATOR + FIELD_SEPERATOR.join(component_part)), FIELD_SEPERATOR)
 
 
-    def get_pv1_data(self, dictionary_item):
-        ''' Gets the PV1 segment '''
-        pv1_comp_list = []       
-        # Key value will be in the format of  ex: 1    OrderedDict([(1, ['1']), (2, defaultdict(<type 'list'>, {}))])
-        for key, value in dictionary_item['PV1'].iteritems():
-            pv1_subcomp_list = []
-            #field_keys and field_values will be in the format of 
-            # 1 <type 'list'>  and 2 <type 'collections.defaultdict'>
-            for field_keys, field_values in value.iteritems():
-                if isinstance(field_values, (list,)):
-                    if len(field_values) == 1:       
-                        pv1_subcomp_list.extend(field_values)
-                    elif len(field_values) > 1:
-                        pv1_subcomp_list.append(self.subcomponent_separator.join(field_values))
-            pv1_comp_list.append(self.component_separator.join(pv1_subcomp_list))
-
-        pv1_result = self.remove_trailing_field_seperators("PV1|" + self.field_separator.join(pv1_comp_list))
-
-
-        return pv1_result
-
-
-
-    def get_obr_data(self, dictionary_item, obr_timestamp_state = False):
-        ''' Gets the OBR segment '''
-        obr_comp_list = []
-        
-        # Key value will be in the format of  ex: 1    OrderedDict([(1, ['1']), (2, defaultdict(<type 'list'>, {}))])
-        for key, value in dictionary_item['OBR'].iteritems():
-            obr_subcomp_list = []
-            #field_keys and field_values will be in the format of 
-            # 1 <type 'list'>  and 2 <type 'collections.defaultdict'>
-            for field_keys, field_values in value.iteritems():
-                if isinstance(field_values, (list,)):
-                    if len(field_values) == 1:       
-                        obr_subcomp_list.extend(field_values)
-                    elif len(field_values) > 1:
-                        obr_subcomp_list.append(self.subcomponent_separator.join(field_values))
-            obr_comp_list.append(self.component_separator.join(obr_subcomp_list))
-
-        # Setting timestamp from the current timestamp + 1s delay for every OBR segment (OBR-7 is the timestamp field)
-        if obr_timestamp_state == True:
-            self.current_time = self.current_time + timedelta(seconds = 1)
-            obr_comp_list[6] = "%d%d%d%d%d%d" % (self.current_time.year, self.current_time.month, self.current_time.day, self.current_time.hour, self.current_time.minute, self.current_time.second)
-
-        obr_result = self.remove_trailing_field_seperators("OBR|" + self.field_separator.join(obr_comp_list))
-
-        return obr_result
-
-    def get_obx_data(self, dictionary_item, obx_timestamp_state = False, df_index_to_write = None):
-        ''' Gets the OBX segment '''
-        obx_comp_list = []
-        
-        # Key value will be in the format of  ex: 1    OrderedDict([(1, ['1']), (2, defaultdict(<type 'list'>, {}))])
-        for key, value in dictionary_item['OBX'].iteritems():
-            obx_subcomp_list = []
-            #field_keys and field_values will be in the format of 
-            # 1 <type 'list'>  and 2 <type 'collections.defaultdict'>
-            for field_keys, field_values in value.iteritems():
-                if isinstance(field_values, (list,)):
-                    if len(field_values) == 1:       
-                        obx_subcomp_list.extend(field_values)
-                    elif len(field_values) > 1:
-                        obx_subcomp_list.append(self.subcomponent_separator.join(field_values))
-            obx_comp_list.append(self.component_separator.join(obx_subcomp_list))
-
-        self.count = self.count + 1
-        obx_comp_list[0] = str(self.count)
-
-        # Setting timestamp from the current timestamp + 1s delay for every OBX segment (OBX-14 is the timestamp field)
-        if obx_timestamp_state == True:
-            self.current_time = self.current_time + timedelta(seconds = 1)
-            obx_comp_list[13] = "%d%d%d%d%d%d" % (self.current_time.year, self.current_time.month, self.current_time.day, self.current_time.hour, self.current_time.minute, self.current_time.second)
-
-            try:
-                self.df.loc[df_index_to_write, "MeasurementTime"] = self.current_time.strftime("%m/%d/%Y - %H:%M:%S")
-            except AttributeError:
-                pass # Add error handling
-
-        obx_result = self.remove_trailing_field_seperators("OBX|" + self.field_separator.join(obx_comp_list))
-
-
-        return obx_result
+        return result
