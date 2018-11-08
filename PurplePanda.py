@@ -311,6 +311,7 @@ class Gui(QtGui.QMainWindow):
                 label = QtGui.QLabel(column)
                 dropdown = QtGui.QPushButton()
                 menu = QtGui.QMenu()
+                print self.hl7_dropdown_menu_items.hl7_dropdown_dict
                 self.make_hl7Menu(dropdown,menu,self.hl7_dropdown_menu_items.hl7_dropdown_dict['OBX'])
                 dropdown.setMenu(menu)
                 # If the NodeID exists in the columns of the excel sheet, then statically set it to PV1-3
