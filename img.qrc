@@ -3,5 +3,7 @@
     <file>excel.png</file>
     <file>exit.png</file>
     <file>tool.png</file>
+    <file>config.png</file>
+    <file>manual.png</file>
   </qresource>
 </RCC>
