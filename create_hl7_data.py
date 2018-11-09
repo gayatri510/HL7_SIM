@@ -66,6 +66,7 @@ class Create_Hl7_Data():
 
                 self.hl7_dropdown_dict[key] = self.hl7_seg_field_dict
 
+
     def set_hl7segments_count(self, hl7_menu_dict):
         ''' Obtain the segments' fields, components and subcomponents values and initialize the hl7_dict_values dictionary'''
         segments_and_counts_dict = self.get_segments_and_count_dict(hl7_menu_dict)
@@ -94,9 +95,17 @@ class Create_Hl7_Data():
         for index, field_value in enumerate(field_values):
             component_values = field_value.split(COMPONENT_SEPERATOR)
             if len(component_values) == 1:
-                self.hl7_dict_values[key_val][index + 1][1][1] = field_value
+                try:
+                    self.hl7_dict_values[key_val][index + 1][1][1] = field_value
+                except KeyError:
+                    raise Exception("The %s segment entered by the user has more fields than the default %s Field Count"
+                                    " set in the Configuration Page. Please change the default settings to a higher number in the Configuration Page" % (key_val, key_val))
             elif len(component_values) == 0:
-                self.hl7_dict_values[key_val][index + 1][1][1] = ''
+                try:
+                    self.hl7_dict_values[key_val][index + 1][1][1] = ''
+                except KeyError:
+                    raise Exception("The %s segment entered by the user has more fields than the default %s Field Count"
+                                    " set in the Configuration Page. Please change the default settings to a higher number in the Configuration Page and rerun the Mapping" % (key_val, key_val))
 
             # If the field has multiple componetns like "000000 & 111111^^^^AN"
             elif len(component_values) > 1:
@@ -105,15 +114,27 @@ class Create_Hl7_Data():
                     subcomponent_values = component_value.split(SUBCOMPONENT_SEPERATOR)
                     # If this list is empty, it means this component doesn't have multiple subcomponents
                     if len(subcomponent_values) == 1:
-                        self.hl7_dict_values[key_val][index + 1][comp_index + 1][1] = component_value
+                        try:
+                            self.hl7_dict_values[key_val][index + 1][comp_index + 1][1] = component_value
+                        except KeyError:
+                            raise Exception("The %s segment entered by the user has more components than the default %s Component Count"
+                                    " set in the Configuration Page. Please change the default settings to a higher number in the Configuration Page and rerun the Mapping" % (key_val, key_val))
                     else:
                         for s_index, subcompvalues in enumerate(subcomponent_values):
-                            self.hl7_dict_values[key_val][index + 1][comp_index + 1][s_index + 1] = subcompvalues
+                            try:
+                                self.hl7_dict_values[key_val][index + 1][comp_index + 1][s_index + 1] = subcompvalues
+                            except KeyError:
+                                raise Exception("The %s segment entered by the user has more subcomponents than the default %s Subcomponent Count"
+                                    " set in the Configuration Page. Please change the default settings to a higher number in the Configuration Page and rerun the Mapping" % (key_val, key_val))
 
-    def split_message_box_segments(self, list_of_message_information):
-        # Obtain the text from each of the HL7 segments, call the populate_each_seg_dict method
-            for each_info in list_of_message_information:
-                self.populate_each_seg_dict(segment_box_data=each_info.text())
+    def split_message_box_segments(self, message_information_dict):
+        for key_val, value in message_information_dict.iteritems():
+            first_field_val = str(value.text()).strip().split(FIELD_SEPERATOR)
+            # Check if the first field value matches the segment the string is in and if not raise an Exception
+            if key_val == first_field_val[0]:
+                self.populate_each_seg_dict(segment_box_data=value.text())
+            else:
+                raise Exception("The string entered in the %s segment is expected to start with %s but instead is starting with %s" % (key_val, key_val, first_field_val[0]))
 
     def remove_variables_from_list(self, var_list):
         ''' This will remove the variables from the var_list from the pandas dataframe'''
@@ -125,6 +146,7 @@ class Create_Hl7_Data():
         # This part of the code will work with the QE input sheet, read the excel into a pandas data frame
         # Rename the columns to the appropriate HL7 segments and then generate the HL7 file
         # The Code below ensures that each column data is taken as string instead of doing any conversions to float, int etc.
+        self.sheet = sheet_to_read_from
         df_actual = excel_sheet.parse(sheet_to_read_from)
         self.df = excel_sheet.parse(sheet_to_read_from, converters={col: str for col in df_actual.columns.values.tolist()})
         # Remove the calculated and non_obx Capsule Variable IDs that will not be part of the OBX messages
@@ -230,6 +252,8 @@ class Create_Hl7_Data():
                 for item in self.mapping_list:
                     # Grab the value from that particular column except if it is empty, an Attribute Error is thrown, then set it to ""
                     row_value = self.get_row_value(row_entry[item])
+                    if (len(row_value.split(FIELD_SEPERATOR))) > 1:
+                        raise Exception("The data found at row %i and column mapped to %s in the %s sheet has the | character. This value is invalid. Please check the data!!!" % (row_index, item, self.sheet))
                     # If the field is in the format of a timestamp, parse it and format it appropriately to add to the simfile
                     try:
                         dt = datetime.strptime(row_value, "%m/%d/%Y - %H:%M:%S.%f")
@@ -248,18 +272,16 @@ class Create_Hl7_Data():
                 try:
                     self.hl7_file_message[message_id].append(self.hl7_dict_values_each_msg)
                 except KeyError:
-                    QtGui.QMessageBox.critical(self, "FATAL ERROR", "No NodeID was found at row_index %s in the excel sheet" % (str(row_index)))
+                    raise Exception("No NodeID was found at row_index %i in the %s sheet" % (row_index, self.sheet))
                 self.hl7_file_message = OrderedDict(sorted(self.hl7_file_message.items(), key=lambda t: t[0]))
         # Remove the non_obx_variables from the list once their values are obtained for further computation
         self.remove_variables_from_list([tupleelement[0] for tupleelement in self.non_obx_variables_list])
         # Remove PV1-3 / NodeID/ 1931 variable from the self.non_obx_variables_list if any else it will incorrectly override any existing NodeIDs and mess up the messages
         self.non_obx_variables_list = [i for i in self.non_obx_variables_list if i[0] != '1931']
         myIterator = cycle(range(self.num_of_unique_ids))
-        print self.non_obx_variables_list
         # Insert the non-obx variables in the self.hl7_file_message before returning it
         for caps_id, var_value in self.non_obx_variables_list:
             nodeid_curr = list(self.hl7_file_message.keys())[myIterator.next()]
-            print nodeid_curr
             self.set_data(data=var_value, data_dict=self.hl7_file_message[nodeid_curr][0], item_to_split=self.non_obx_variables_dict[caps_id])
         return self.hl7_file_message
     
@@ -295,12 +317,13 @@ class Create_Hl7_Data():
         # Setting timestamp from the current timestamp + 1s delay for every segment that has timestamp = True
         if timestamp_state is True and timestamp_index is not None:
             self.current_time = self.current_time + timedelta(seconds=1)
-            component_part[timestamp_index - 1] = "%d%d%d%d%d%d" % (self.current_time.year, self.current_time.month, self.current_time.day, self.current_time.hour, self.current_time.minute, self.current_time.second)
+            try:
+                component_part[timestamp_index - 1] = "%d%d%d%d%d%d" % (self.current_time.year, self.current_time.month, self.current_time.day, self.current_time.hour, self.current_time.minute, self.current_time.second)
+            except IndexError:
+                raise Exception("Please check the %s Field Count value in the Configuration Page."
+                                " It has to be atleast %i in order for the tool to generate the %s-%i timestamp" %(key_val, timestamp_index, key_val, timestamp_index))
             if index_to_write is not None:
-                try:
-                    self.df.loc[index_to_write, "MeasurementTime"] = self.current_time.strftime("%m/%d/%Y - %H:%M:%S")
-                except AttributeError:
-                    pass   # Add error handling
+                self.df.loc[index_to_write, "MeasurementTime"] = self.current_time.strftime("%m/%d/%Y - %H:%M:%S")
         if key_val == 'MSH':
             result = self.remove_trailing_delimiters(FIELD_SEPERATOR.join(component_part), FIELD_SEPERATOR)
         else:
