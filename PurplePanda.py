@@ -192,14 +192,13 @@ class Gui(QtGui.QMainWindow):
 
     def set_message_boxes(self):
         '''Creates the hboxes for the HL7 segment fields before the table'''
-        self.list_of_message_information = []
-        self.messagebox_segments = self.current_hl7_segment_data.split(",")
-        for each_message in self.messagebox_segments:
+        self.message_box_dict = OrderedDict()
+        for each_message in self.current_hl7_segment_data.split(","):
             message_label = QtGui.QLabel(each_message)
             message_box_information = QtGui.QLineEdit()
             self.headers.addWidget(message_label)
             self.headers.addWidget(message_box_information)
-            self.list_of_message_information.append(message_box_information)
+            self.message_box_dict[str(each_message).strip()] = message_box_information
 
     def make_hl7Menu(self, dropdown, menu, hl7_dictionary):
         '''Creates the dropdown HL7 menu for the user to select for mapping'''
@@ -207,16 +206,16 @@ class Gui(QtGui.QMainWindow):
             if key == " ":
                 action = menu.addAction(key)
                 action.triggered.connect(self.updateTable(dropdown, key))
-                continue
-            sub_menu = menu.addMenu(key)
-            action = sub_menu.addAction(key)
-            action.triggered.connect(self.updateTable(dropdown, key))
-            if isinstance(hl7_dictionary[key], dict):
-                self.make_hl7Menu(dropdown, sub_menu, hl7_dictionary[key])
             else:
-                for dict_value in hl7_dictionary[key]:
-                    action = sub_menu.addAction(dict_value)
-                    action.triggered.connect(self.updateTable(dropdown, dict_value))
+                sub_menu = menu.addMenu(key)
+                action = sub_menu.addAction(key)
+                action.triggered.connect(self.updateTable(dropdown, key))
+                if isinstance(hl7_dictionary[key], dict):
+                    self.make_hl7Menu(dropdown, sub_menu, hl7_dictionary[key])
+                else:
+                    for dict_value in hl7_dictionary[key]:
+                        action = sub_menu.addAction(dict_value)
+                        action.triggered.connect(self.updateTable(dropdown, dict_value))
 
     def closeEvent(self, event):
         reply = QtGui.QMessageBox.question(self, 'Message',
@@ -229,8 +228,11 @@ class Gui(QtGui.QMainWindow):
 
     def helpMessage(self):
         ''' Opens the user manual for Purple Panda'''
-        file = "help.doc"
-        os.system(file)
+        file = "usermanual.doc"
+        x = os.system(file)
+        # if x is 1, it means the file couldn't be opened, raise an exception 
+        if x == 1:
+            raise Exception("The document is already open or does not exist. Please check if a usermanual.doc exists in the Purple Panda Folder")
 
     def user_display_message(self):
         ''' Displays a message if '''
@@ -280,6 +282,9 @@ class Gui(QtGui.QMainWindow):
         if not self.hl7_dropdown_menu_items:
             self.hl7_dropdown_menu_items = Create_Hl7_Data()
         self.hl7_dropdown_menu_items.create_dropdown_items_from_dict(self.current_configurationbox_segments_data)
+        dropdown_dict = dict((key,value) for key, value in self.hl7_dropdown_menu_items.hl7_dropdown_dict.iteritems() if key == 'OBX')
+        dropdown_dict.update({'':''})
+        #dropdown_dict = dict((key, value) for key, value in self.hl7_dropdown_menu_items.hl7_dropdown_dict.iteritems if key == 'OBX' or key == '')
         # for each scenario sheet in the inputted QE sheet, create a tab and populate with a table
         tables = []
         xtabs = []
@@ -301,6 +306,13 @@ class Gui(QtGui.QMainWindow):
             tables[sht_idx].verticalHeader().setVisible(False)
             tables[sht_idx].setRowCount(len(self.xfile.parse(sheet).columns))
             tables[sht_idx].setColumnCount(2) 
+
+            # Check that the sheets are not blank
+            if len(self.xfile.parse(sheet).columns) == 0:
+                QtGui.QMessageBox.warning(self, 'Found Blank sheet',
+                                              'The %s sheet is blank. Please import a valid sheet with data' % (sheet), QtGui.QMessageBox.Ok)
+
+
             if 'NodeID' not in self.xfile.parse(sheet).columns:
                 QtGui.QMessageBox.warning(self, 'Missing NodeID column',
                                               'NodeID column is missing in the %s sheet. \nPlease make sure that there is a valid NodeID column in that sheet, ' 
@@ -311,8 +323,7 @@ class Gui(QtGui.QMainWindow):
                 label = QtGui.QLabel(column)
                 dropdown = QtGui.QPushButton()
                 menu = QtGui.QMenu()
-                print self.hl7_dropdown_menu_items.hl7_dropdown_dict
-                self.make_hl7Menu(dropdown,menu,self.hl7_dropdown_menu_items.hl7_dropdown_dict['OBX'])
+                self.make_hl7Menu(dropdown,menu, dropdown_dict)
                 dropdown.setMenu(menu)
                 # If the NodeID exists in the columns of the excel sheet, then statically set it to PV1-3
                 if label.text() == "NodeID":
@@ -462,14 +473,26 @@ class Gui(QtGui.QMainWindow):
                 dropdown.setMenu(menu)
         return True
 
+    def check_required_hl7_segments_exist(self, message_box_dict):
+        ''' Checks whether the required HL7 segments, i.e. MSH, PID, PV1, OBR fields exist'''
+        if 'MSH' not in message_box_dict.keys():
+            raise Exception('MSH field is required for the mapping but is missing. Please add the MSH segment box in the Configuration page and rerun the Mapping')
+        elif 'PID' not in message_box_dict.keys():
+            raise Exception('PID field is required for the mapping but is missing. Please add the PID segment box in the Configuration page and rerun the Mapping')
+        elif 'PV1' not in message_box_dict.keys():
+            raise Exception('PV1 field is required for the mapping but is missing. Please add the PV1 segment box in the Configuration page and rerun the Mapping')
+        elif 'OBR' not in message_box_dict.keys():
+            raise Exception('OBR field is required for the mapping but is missing. Please add the OBR segment box in the Configuration page and rerun the Mapping')
+        else:
+            return True
 
     def generic_set_mapping(self):
         ''' This runs all the setup necessary to build the sim files'''
         self.create_hl7_dict_values = Create_Hl7_Data()
         self.create_hl7_dict_values.set_hl7segments_count(self.current_configurationbox_segments_data)
-        # Obtain the texts and map them to the respective HL7 Segmenclsts
-        self.create_hl7_dict_values.split_message_box_segments(self.list_of_message_information)
-        # update status bar
+        if self.check_required_hl7_segments_exist(self.message_box_dict) is True:
+            # Obtain the texts and map them to the respective HL7 Segments
+            self.create_hl7_dict_values.split_message_box_segments(self.message_box_dict)
         self.statusBar().showMessage('Wait!...Mapping...')
         # Reads data from the current tab's sheet and table   
         self.sheetab_string = str(self.tabs.tabText (self.tabs.currentIndex()))
@@ -482,14 +505,9 @@ class Gui(QtGui.QMainWindow):
 
     def get_static_header_segments(self):
         '''Gets any static header segment info to be added for every HL7 message'''
-        message_box_dict = OrderedDict()
-        additional_seg_results = []
-        for messagebox_info in self.list_of_message_information:
-            message_box_dict[(str(messagebox_info.text()).split('|'))[0]] = str(messagebox_info.text())
-
         if self.current_hl7_segment_data != DEFAULT_HL7_SEGMENTS:
             diff_msg_boxes_list = set([x.strip() for x in map(str, self.current_hl7_segment_data.split(','))]).difference([y.strip() for y in map(str, DEFAULT_HL7_SEGMENTS.split(','))])
-            additional_seg_results = [message_box_dict[diff_segment] for diff_segment in diff_msg_boxes_list if diff_segment in message_box_dict.keys()]
+            additional_seg_results = [(self.message_box_dict[diff_segment]).text() for diff_segment in diff_msg_boxes_list if diff_segment in self.message_box_dict.keys()]
         else:
             additional_seg_results = None
 
@@ -515,12 +533,7 @@ class Gui(QtGui.QMainWindow):
                 current_node_id = match_found.group(3) 
                 list_of_indexes = self.create_hl7_dict_values.df.index[self.create_hl7_dict_values.df['PV1-3'] == current_node_id].tolist()
                 index_cycle = cycle(list_of_indexes)
-            else:
-                print "No Node ID found"
-        else:
-            pass # Nothing needs to be done
-
-        
+           
         for each_dict_item in data_dict:
             if self.current_obx_14_timestamp_state is True:
                 df_index_to_write = next(index_cycle)
