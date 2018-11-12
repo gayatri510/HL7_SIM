@@ -74,14 +74,14 @@ class Configuration_Window(QtGui.QDialog):
         # Create a table for the Header Variables table
         self.headervariablesGroupBox = QtGui.QGroupBox("Header Variables")
         self.headervariablesTable = QtGui.QTableWidget()
-        self.headervariablesTable.horizontalHeader().setVisible(False)
+        self.headervariablesTable.horizontalHeader().setVisible(True)
         self.headervariablesTable.verticalHeader().setVisible(False)
         self.headervariablesTable.setColumnCount(2)
+        self.headervariablesTable.setHorizontalHeaderLabels(("Capsule Variable ID", "Header Description"))
         self.headervariablesTable.setRowCount(len(self.default_header_variable_values_dict) + 10) # Adding 10 more rows for the user to add more variables if required
         for row_item, key in enumerate(self.default_header_variable_values_dict.keys()):
             self.headervariablesTable.setItem(row_item, 0, QtGui.QTableWidgetItem(key))
-            self.headervariablesTable.setItem(row_item, 1, QtGui.QTableWidgetItem(self.default_header_variable_values_dict[key]))
-        self.headervariablesTable.setHorizontalHeaderLabels(("Capsule Variable ID", "Header Description"))
+            self.headervariablesTable.setItem(row_item, 1, QtGui.QTableWidgetItem(self.default_header_variable_values_dict[key]))   
         self.headervariablesTable.horizontalHeader().setResizeMode(0, QtGui.QHeaderView.Stretch)
         self.headervariablesTable.horizontalHeader().setResizeMode(1, QtGui.QHeaderView.Stretch)
         self.headervariablesTable.horizontalHeader().resizeSection(1, 180)
@@ -107,7 +107,7 @@ class Configuration_Window(QtGui.QDialog):
         self.obx14_timestamp_checkbox.stateChanged.connect(self.obx14_timestamp_statechange)
 
         # Create action menus Ok and cancel to accept or cancel the selected settings
-        self.buttonBox = QtGui.QDialogButtonBox(QtGui.QDialogButtonBox.Ok | QtGui.QDialogButtonBox.Discard)
+        self.buttonBox = QtGui.QDialogButtonBox(QtGui.QDialogButtonBox.Ok | QtGui.QDialogButtonBox.Cancel)
         self.buttonBox.accepted.connect(self.accept)
         self.buttonBox.rejected.connect(self.reject)
 
