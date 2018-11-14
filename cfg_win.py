@@ -14,7 +14,7 @@ class Configuration_Window(QtGui.QDialog):
         self.cfg_window_settings = QtCore.QSettings("CapsuleTech", "Configuration_Window")
         self.setWindowIcon(QtGui.QIcon(':/config.png'))
         self.load_cfg_settings(settings_to_load)
-        self.create_widgets_actions()
+        self.create_UI()
 
     def load_cfg_settings(self, settings_to_load):
         '''Load the settings from the Main Page to the Configuration Page'''
@@ -36,7 +36,7 @@ class Configuration_Window(QtGui.QDialog):
         self.default_obr7_timestamp_state = settings_to_load.value('OBR 7 timestamp').toBool()
         self.default_obx14_timestamp_state = settings_to_load.value('OBX 14 timestamp').toBool()
 
-    def create_widgets_actions(self):
+    def create_UI(self):
         '''Create widgets and action on the config page'''
         # Create HL7 segment box
         msg_label = QtGui.QLabel("HL7 Segments")
@@ -78,10 +78,10 @@ class Configuration_Window(QtGui.QDialog):
         self.headervariablesTable.verticalHeader().setVisible(False)
         self.headervariablesTable.setColumnCount(2)
         self.headervariablesTable.setHorizontalHeaderLabels(("Capsule Variable ID", "Header Description"))
-        self.headervariablesTable.setRowCount(len(self.default_header_variable_values_dict) + 10) # Adding 10 more rows for the user to add more variables if required
+        self.headervariablesTable.setRowCount(len(self.default_header_variable_values_dict) + 10)  # Adding 10 more rows for the user to add more variables if required
         for row_item, key in enumerate(self.default_header_variable_values_dict.keys()):
             self.headervariablesTable.setItem(row_item, 0, QtGui.QTableWidgetItem(key))
-            self.headervariablesTable.setItem(row_item, 1, QtGui.QTableWidgetItem(self.default_header_variable_values_dict[key]))   
+            self.headervariablesTable.setItem(row_item, 1, QtGui.QTableWidgetItem(self.default_header_variable_values_dict[key]))
         self.headervariablesTable.horizontalHeader().setResizeMode(0, QtGui.QHeaderView.Stretch)
         self.headervariablesTable.horizontalHeader().setResizeMode(1, QtGui.QHeaderView.Stretch)
         self.headervariablesTable.horizontalHeader().resizeSection(1, 180)
@@ -126,10 +126,8 @@ class Configuration_Window(QtGui.QDialog):
         self.setWindowTitle("Configuration Settings")
         self.resize(900, 600)
 
-
-
     def obr7_timestamp_statechange(self):
-        '''Checks the OBR7 checkbox state'''
+        '''Check the OBR-7 checkbox state'''
         if self.obr7_timestamp_checkbox.isChecked() is True:
             self.obr7_timestamp_checkbox.setChecked(True)
             self.cfg_window_settings.setValue('OBR 7 timestamp', True)
@@ -138,7 +136,7 @@ class Configuration_Window(QtGui.QDialog):
             self.cfg_window_settings.setValue('OBR 7 timestamp', False)
 
     def obx14_timestamp_statechange(self):
-        '''Checks the OBX14 checkbox state'''
+        '''Check the OBX-14 checkbox state'''
         if self.obx14_timestamp_checkbox.isChecked() is True:
             self.obx14_timestamp_checkbox.setChecked(True)
             self.cfg_window_settings.setValue('OBX 14 timestamp', True)
@@ -147,7 +145,7 @@ class Configuration_Window(QtGui.QDialog):
             self.cfg_window_settings.setValue('OBX 14 timestamp', False)
 
     def get_current_settings(self):
-        ''' Grabs the current settings on the config page and stores it to the the cfg_window_settings Qsettings object'''
+        ''' Grab the current settings on the config page and store it to the the cfg_window_settings Qsettings object'''
         # Grab the HL7 segments list
         current_hl7_segments = self.msg_linedit.text()
         self.cfg_window_settings.setValue('HL7_segments', current_hl7_segments)
@@ -156,7 +154,7 @@ class Configuration_Window(QtGui.QDialog):
         current_calculated_variables = self.calculated_variables.text()
         self.cfg_window_settings.setValue('Calculated Variables', current_calculated_variables)
 
-        # Grab the HL7 configurationbox segment dictionary values 
+        # Grab the HL7 configurationbox segment dictionary values
         current_configurationbox_segments = deepcopy(self.default_hl7_segment_setting_values_dict)
         for row in range(0, self.table.rowCount()):
             column0_text = str(self.table.cellWidget(row, 0).text())
